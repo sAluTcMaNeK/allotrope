@@ -8,13 +8,12 @@
   import CompressionFields from "./CompressionFields.svelte";
   import Segmented from "./Segmented.svelte";
   import { reglages, type TypeDestination } from "./reglages.svelte";
+  import { destination } from "./destination.svelte";
 
   interface Props {
-    /** Chemin complet de Documents\Allotrope, pour l'affichage. */
-    dossierDocuments: string;
     onfermer: () => void;
   }
-  let { dossierDocuments, onfermer }: Props = $props();
+  let { onfermer }: Props = $props();
 
   let version = $state("");
   onMount(() => {
@@ -30,7 +29,7 @@
   async function choisirDossier(): Promise<boolean> {
     const choix = await open({
       directory: true,
-      defaultPath: reglages.dossierPersonnalise || dossierDocuments,
+      defaultPath: reglages.dossierPersonnalise || destination.documents,
       title: "Choisir le dossier de destination",
     });
     if (!choix) return false;
@@ -52,6 +51,10 @@
     ["image (Rust)", "MIT / Apache 2.0"],
     ["libwebp (Google)", "BSD"],
     ["oxipng", "MIT"],
+    ["resvg (SVG)", "MIT / Apache 2.0"],
+    ["jxl-oxide (JPEG XL)", "MIT / Apache 2.0"],
+    ["lopdf (PDF)", "MIT"],
+    ["pdf.js (Mozilla)", "Apache 2.0"],
     ["Police Nunito", "SIL Open Font License"],
     ["Icônes Lucide", "ISC"],
   ];
@@ -77,7 +80,7 @@
       />
       <div class="aide">
         {#if reglages.destination === "documents"}
-          {dossierDocuments}
+          {destination.documents}
         {:else if reglages.destination === "origine"}
           Chaque fichier produit est enregistré dans le même dossier que son original.
         {:else}

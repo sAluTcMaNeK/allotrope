@@ -1,26 +1,17 @@
-<!-- Pied de la file d'attente : dossier de destination et bouton principal de lancement. -->
+<!-- Pied de page d'un outil : dossier de destination et bouton principal de lancement. -->
 <script lang="ts">
   import { ArrowRight, Folder } from "@lucide/svelte";
-  import type { Mode } from "./fichiers";
+  import { choisirDestination, libelleDestination } from "./destination.svelte";
 
   interface Props {
-    mode: Mode;
-    /** Nombre de fichiers que l'outil actif va traiter. */
-    aTraiter: number;
-    enCours: boolean;
-    /** Destination lisible (« Documents › Allotrope », « À côté des originaux »…). */
-    destination: string;
-    onmodifierdestination: () => void;
+    /** Texte du bouton principal (« Convertir 3 fichiers », « Fusionner les PDF »…). */
+    libelle: string;
+    desactive: boolean;
     onlancer: () => void;
   }
-  let { mode, aTraiter, enCours, destination, onmodifierdestination, onlancer }: Props = $props();
+  let { libelle, desactive, onlancer }: Props = $props();
 
-  const libelle = $derived.by(() => {
-    if (enCours) return mode === "convertir" ? "Conversion en cours…" : "Compression en cours…";
-    if (aTraiter === 0) return "Rien à traiter";
-    const verbe = mode === "convertir" ? "Convertir" : "Compresser";
-    return `${verbe} ${aTraiter} fichier${aTraiter > 1 ? "s" : ""}`;
-  });
+  const destination = $derived(libelleDestination());
 </script>
 
 <footer class="pied">
@@ -28,9 +19,9 @@
     <span class="icone"><Folder size={20} strokeWidth={2.4} /></span>
     <span class="libelle">Enregistrer dans</span>
     <span class="chemin" title={destination}>{destination}</span>
-    <button class="lien" onclick={onmodifierdestination}>Modifier</button>
+    <button class="lien" onclick={choisirDestination}>Modifier</button>
   </div>
-  <button class="principal" disabled={enCours || aTraiter === 0} onclick={onlancer}>
+  <button class="principal" disabled={desactive} onclick={onlancer}>
     {libelle}
     <ArrowRight size={18} strokeWidth={3} />
   </button>

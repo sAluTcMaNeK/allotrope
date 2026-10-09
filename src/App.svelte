@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
-  import { dirname, documentDir, join } from "@tauri-apps/api/path";
   import { open } from "@tauri-apps/plugin-dialog";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import TitleBar from "./lib/TitleBar.svelte";
@@ -13,6 +12,9 @@
   import QueueFooter from "./lib/QueueFooter.svelte";
   import Settings from "./lib/Settings.svelte";
   import Splash from "./lib/Splash.svelte";
+  import PdfTools from "./lib/pdf/PdfTools.svelte";
+  import { depot } from "./lib/depot.svelte";
+  import { dossierPour, initialiserDestination } from "./lib/destination.svelte";
   import {
     FAMILLES,
     LISTE_FAMILLES,
@@ -39,10 +41,7 @@
   let pagePrecedente = $state<Page>("accueil");
   let mode = $state<Mode>("convertir");
   let elements = $state<ElementFile[]>([]);
-  // Vrai pendant qu'un glisser-déposer survole la fenêtre
-  let survol = $state(false);
   let enCours = $state(false);
-  let dossierDocuments = $state("");
   /** Message temporaire (fichiers ignorés…). */
   let message = $state<string | null>(null);
 
@@ -58,7 +57,7 @@
 
   /** Famille de la page affichée, ou `null` sur l'accueil. */
   const famille = $derived<Famille | null>(
-    page !== "accueil" && page !== "parametres" ? page : null,
+    page !== "accueil" && page !== "parametres" && page !== "pdf" ? page : null,
   );
   /** Fichiers affichés : tous sur l'accueil, ceux de la famille sur une page dédiée. */
   const visibles = $derived(famille ? elements.filter((e) => e.info.famille === famille) : elements);
@@ -72,11 +71,11 @@
     return c;
   });
 
-  const libelleDestination = $derived.by(() => {
-    if (reglages.destination === "documents") return "Documents › Allotrope";
-    if (reglages.destination === "origine") return "À côté des originaux";
-    // « C:\Users\…\Images\Export » s'affiche « Images › Export »
-    return reglages.dossierPersonnalise.split(/[\\/]/).filter(Boolean).slice(-2).join(" › ");
+  const libelleLancement = $derived.by(() => {
+    if (enCours) return mode === "convertir" ? "Conversion en cours…" : "Compression en cours…";
+    const n = aTraiter.length;
+    if (n === 0) return "Rien à traiter";
+    return `${mode === "convertir" ? "Convertir" : "Compresser"} ${n} fichier${n > 1 ? "s" : ""}`;
   });
 
   function naviguer(cible: Page) {
@@ -181,26 +180,6 @@
     if (choix) await ajouter(choix);
   }
 
-  async function modifierDestination() {
-    const choix = await open({
-      directory: true,
-      defaultPath: reglages.destination === "personnalise" ? reglages.dossierPersonnalise : dossierDocuments,
-      title: "Choisir le dossier de destination",
-    });
-    if (!choix) return;
-    reglages.dossierPersonnalise = choix;
-    reglages.destination = "personnalise";
-  }
-
-  /** Dossier où enregistrer le fichier produit à partir de `element`. */
-  async function dossierPour(element: ElementFile): Promise<string> {
-    if (reglages.destination === "origine") return dirname(element.info.chemin);
-    if (reglages.destination === "personnalise" && reglages.dossierPersonnalise) {
-      return reglages.dossierPersonnalise;
-    }
-    return dossierDocuments;
-  }
-
   async function lancer() {
     const outil = mode;
     const aFaire = [...aTraiter];
@@ -219,7 +198,7 @@
         element.etat = "encours";
         element.erreur = undefined;
         try {
-          const dossier = await dossierPour(element);
+          const dossier = await dossierPour(element.info.chemin);
           element.resultat =
             outil === "convertir"
               ? await convertirImage(element.info.chemin, dossier, element.format!, qualite)
@@ -239,20 +218,20 @@
 
   onMount(() => {
     // Destination par défaut : Documents\Allotrope (créé au premier fichier produit)
-    documentDir()
-      .then((documents) => join(documents, "Allotrope"))
-      .then((chemin) => (dossierDocuments = chemin));
+    initialiserDestination();
 
-    // Tauri intercepte le glisser-déposer au niveau de la fenêtre et fournit les chemins complets
+    // Tauri intercepte le glisser-déposer au niveau de la fenêtre et fournit les chemins complets.
+    // Sur la page Outils PDF, les fichiers vont à l'outil ouvert (s'il en attend).
     const arret = getCurrentWebview().onDragDropEvent(({ payload }) => {
-      if (page === "parametres") return;
+      if (page === "parametres" || (page === "pdf" && !depot.cible)) return;
       if (payload.type === "enter" || payload.type === "over") {
-        survol = true;
+        depot.survol = true;
       } else if (payload.type === "leave") {
-        survol = false;
+        depot.survol = false;
       } else if (payload.type === "drop") {
-        survol = false;
-        ajouter(payload.paths);
+        depot.survol = false;
+        if (page === "pdf") depot.cible?.(payload.paths);
+        else ajouter(payload.paths);
       }
     });
     return () => {
@@ -273,7 +252,9 @@
 
     <main class="contenu">
       {#if page === "parametres"}
-        <Settings {dossierDocuments} onfermer={basculerParametres} />
+        <Settings onfermer={basculerParametres} />
+      {:else if page === "pdf"}
+        <PdfTools />
       {:else}
         <div class="page">
           <div class="defilement">
@@ -300,13 +281,13 @@
             />
 
             {#if visibles.length === 0}
-              <DropZone {mode} {famille} {survol} onparcourir={parcourir} />
+              <DropZone {mode} {famille} survol={depot.survol} onparcourir={parcourir} />
             {:else}
               <FileQueue
                 elements={visibles}
                 {mode}
                 typeCompression={compression.type}
-                {survol}
+                survol={depot.survol}
                 onajouter={parcourir}
                 onretirer={retirer}
                 onformat={changerFormat}
@@ -317,11 +298,8 @@
 
           {#if visibles.length > 0}
             <QueueFooter
-              {mode}
-              aTraiter={aTraiter.length}
-              {enCours}
-              destination={libelleDestination}
-              onmodifierdestination={modifierDestination}
+              libelle={libelleLancement}
+              desactive={enCours || aTraiter.length === 0}
               onlancer={lancer}
             />
           {/if}

@@ -1,6 +1,6 @@
-<!-- Barre latérale : accueil, pages par type de fichiers et rappel « 100 % local ». -->
+<!-- Barre latérale : accueil, pages par type de fichiers, outils PDF et rappel « 100 % local ». -->
 <script lang="ts">
-  import { House, ShieldCheck } from "@lucide/svelte";
+  import { FileStack, House, ShieldCheck } from "@lucide/svelte";
   import { LISTE_FAMILLES } from "./fichiers";
   import type { Page } from "./navigation";
 
@@ -41,6 +41,19 @@
         {#if compteurs[id]}<span class="compteur">{compteurs[id]}</span>{/if}
       </button>
     {/each}
+  </div>
+
+  <div class="groupe">
+    <div class="sur-titre">Outils</div>
+    <button
+      class="element"
+      class:actif={page === "pdf"}
+      aria-current={page === "pdf" ? "page" : undefined}
+      onclick={() => onnaviguer("pdf")}
+    >
+      <FileStack size={18} strokeWidth={2.4} />
+      <span class="texte">Outils PDF</span>
+    </button>
   </div>
 
   <div class="local">

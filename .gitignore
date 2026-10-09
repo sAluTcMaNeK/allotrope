@@ -4,6 +4,9 @@ node_modules/
 # Build de l'interface
 dist/
 
+# Ressources pdf.js copiées depuis node_modules (scripts/copier-pdfjs.mjs)
+public/pdfjs/
+
 # Rust / Tauri
 src-tauri/target/
 src-tauri/gen/schemas
