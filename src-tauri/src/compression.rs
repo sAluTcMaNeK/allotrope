@@ -1,15 +1,21 @@
 //! Compression d'images : réduit le poids en gardant le format d'origine (JPEG, PNG, WebP).
 //! Deux façons de régler : un taux de compression, ou une taille de fichier cible.
 
-use crate::conversion::{encoder, enregistrer, lire, nom_sans_extension, FormatImage};
+use crate::conversion::{encoder, enregistrer, extension_de, lire, nom_sans_extension, FormatImage};
 use image::imageops::FilterType;
 use image::DynamicImage;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
+/// Format compressible correspondant à une extension : seuls JPEG, PNG et WebP ont un sens ici.
+fn format_compressible(extension: &str) -> Option<FormatImage> {
+    FormatImage::depuis_extension(&extension.to_lowercase())
+        .filter(|f| matches!(f, FormatImage::Jpeg | FormatImage::Png | FormatImage::Webp))
+}
+
 /// Vrai si un fichier de cette extension peut être compressé.
 pub fn compressible(extension: &str) -> bool {
-    FormatImage::depuis_extension(&extension.to_lowercase()).is_some()
+    format_compressible(extension).is_some()
 }
 
 /// Résultat renvoyé à l'interface.
@@ -49,16 +55,12 @@ pub fn compresser(
     taille_cible: Option<u64>,
     taille_max: Option<u32>,
 ) -> Result<ResultatCompression, String> {
-    let extension = source
-        .extension()
-        .map(|e| e.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
-    let format = FormatImage::depuis_extension(&extension)
-        .ok_or("Ce format ne peut pas encore être compressé")?;
+    let extension = extension_de(source);
+    let format = format_compressible(&extension).ok_or("Ce format ne peut pas encore être compressé")?;
 
     let originaux = std::fs::read(source).map_err(|e| format!("Impossible d'ouvrir le fichier : {e}"))?;
     let taille_originale = originaux.len() as u64;
-    let mut image = lire(&originaux)?;
+    let mut image = lire(&originaux, &extension)?;
 
     let redimensionnee = match taille_max {
         Some(max) if image.width() > max || image.height() > max => {

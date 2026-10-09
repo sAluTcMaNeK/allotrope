@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type Famille = "image" | "video" | "audio" | "document";
-export type FormatImage = "jpeg" | "png" | "webp";
+export type FormatImage = "jpeg" | "png" | "webp" | "bmp" | "tiff" | "gif" | "ico" | "tga" | "qoi";
 export type Mode = "convertir" | "compresser";
 
 /** Miroir de la structure Rust `InfoFichier`. */
@@ -120,6 +120,12 @@ export const LIBELLES_FORMAT: Record<FormatImage, string> = {
   jpeg: "JPG",
   png: "PNG",
   webp: "WEBP",
+  tiff: "TIFF",
+  bmp: "BMP",
+  gif: "GIF",
+  ico: "ICO",
+  tga: "TGA",
+  qoi: "QOI",
 };
 
 /**
@@ -147,13 +153,17 @@ export const FAMILLES: Record<
     nom: "images",
     couleur: "var(--famille-image)",
     texte: "var(--abysse)",
-    formats: "JPG · PNG · WEBP · SVG · HEIC",
-    extensions: ["jpg", "jpeg", "png", "webp", "bmp", "tif", "tiff", "ico", "svg", "heic", "heif", "avif"],
-    cibles: [
-      { id: "jpeg", libelle: "JPG" },
-      { id: "png", libelle: "PNG" },
-      { id: "webp", libelle: "WEBP" },
+    formats: "JPG · PNG · WEBP · SVG · TIFF · JXL…",
+    // Miroir de EXTENSIONS_LISIBLES (conversion.rs), plus HEIC / AVIF reconnus mais pas encore lisibles
+    extensions: [
+      "jpg", "jpeg", "jfif", "jpe", "png", "apng", "webp", "bmp", "dib", "tif", "tiff", "ico", "tga",
+      "qoi", "pbm", "pgm", "ppm", "pnm", "pam", "hdr", "exr", "dds", "ff", "svg", "svgz", "jxl",
+      "heic", "heif", "avif",
     ],
+    cibles: (Object.entries(LIBELLES_FORMAT) as [FormatImage, string][]).map(([id, libelle]) => ({
+      id,
+      libelle,
+    })),
     conversion: null,
     compression: null,
   },

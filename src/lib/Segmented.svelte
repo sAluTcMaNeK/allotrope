@@ -40,10 +40,11 @@
 </div>
 
 <style>
+  /* Les segments passent à la ligne s'ils sont nombreux (9 formats d'image) */
   .segments {
-    display: inline-grid;
-    grid-auto-columns: minmax(0, 1fr);
-    grid-auto-flow: column;
+    display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
     gap: 6px;
     padding: 5px;
     border-radius: 16px;
@@ -52,6 +53,8 @@
   }
 
   .segment {
+    flex: 1 0 auto;
+    min-width: 72px;
     height: 40px;
     padding: 0 18px;
     border-radius: 12px;

@@ -1,7 +1,7 @@
 //! Analyse des fichiers reçus par l'interface (glisser-déposer ou sélecteur de fichiers).
 
 use crate::compression::compressible;
-use crate::conversion::{formats_sortie, FormatImage};
+use crate::conversion::{formats_sortie, FormatImage, EXTENSIONS_LISIBLES};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -38,10 +38,13 @@ pub struct InfoFichier {
 
 /// Déduit la famille d'un fichier à partir de son extension.
 pub fn famille_depuis_extension(extension: &str) -> Option<Famille> {
-    match extension.to_lowercase().as_str() {
-        "jpg" | "jpeg" | "png" | "webp" | "bmp" | "tif" | "tiff" | "ico" | "svg" | "heic"
-        | "heif" | "avif" => Some(Famille::Image),
+    let extension = extension.to_lowercase();
+    match extension.as_str() {
+        // Le GIF est classé en vidéo (souvent animé, voir DESIGN.md), même s'il peut être converti en image
         "mp4" | "mov" | "mkv" | "avi" | "webm" | "m4v" | "gif" => Some(Famille::Video),
+        // HEIC / AVIF : reconnus mais pas encore lisibles (libheif / libavif plus tard)
+        "heic" | "heif" | "avif" => Some(Famille::Image),
+        e if EXTENSIONS_LISIBLES.contains(&e) => Some(Famille::Image),
         "mp3" | "wav" | "flac" | "ogg" | "m4a" | "aac" | "opus" => Some(Famille::Audio),
         "pdf" | "docx" | "doc" | "odt" | "rtf" => Some(Famille::Document),
         _ => None,
@@ -98,6 +101,9 @@ mod tests {
     #[test]
     fn reconnait_les_familles() {
         assert_eq!(famille_depuis_extension("jpg"), Some(Famille::Image));
+        assert_eq!(famille_depuis_extension("TGA"), Some(Famille::Image));
+        assert_eq!(famille_depuis_extension("svg"), Some(Famille::Image));
+        assert_eq!(famille_depuis_extension("gif"), Some(Famille::Video));
         assert_eq!(famille_depuis_extension("MOV"), Some(Famille::Video));
         assert_eq!(famille_depuis_extension("flac"), Some(Famille::Audio));
         assert_eq!(famille_depuis_extension("docx"), Some(Famille::Document));
