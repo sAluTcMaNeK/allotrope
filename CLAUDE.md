@@ -20,13 +20,13 @@ Logiciel de bureau de conversion de fichiers tout-en-un. Le nom vient de la chim
 
 ## Moteurs de conversion
 
-| Conversion | Moteur | Remarque |
-|---|---|---|
-| Images raster (JPEG, PNG, WebP, BMP…) | crate Rust `image` (ou libvips) | Intégré, sans dépendance externe |
-| PNG → SVG (vectorisation) | `vtracer` (Rust, licence MIT) | Gère la couleur |
-| Vidéo / audio (MOV → MP4, extraction audio, GIF) | FFmpeg en **sidecar** Tauri | Utiliser une build **LGPL** (éviter x264/GPL si code fermé) ; envisager une build réduite aux codecs utiles |
-| Word → PDF | Automatisation de Microsoft Word (COM) si installé, sinon LibreOffice headless | C'est le point le plus délicat |
-| HEIC / AVIF | libheif / libavif | Plus tard |
+| Conversion                                       | Moteur                                                                         | Remarque                                                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Images raster (JPEG, PNG, WebP, BMP…)            | crate Rust `image` (ou libvips)                                                | Intégré, sans dépendance externe                                                                            |
+| PNG → SVG (vectorisation)                        | `vtracer` (Rust, licence MIT)                                                  | Gère la couleur                                                                                             |
+| Vidéo / audio (MOV → MP4, extraction audio, GIF) | FFmpeg en **sidecar** Tauri                                                    | Utiliser une build **LGPL** (éviter x264/GPL si code fermé) ; envisager une build réduite aux codecs utiles |
+| Word → PDF                                       | Automatisation de Microsoft Word (COM) si installé, sinon LibreOffice headless | C'est le point le plus délicat                                                                              |
+| HEIC / AVIF                                      | libheif / libavif                                                              | Plus tard                                                                                                   |
 
 ## Fonctionnalités prévues
 
@@ -58,3 +58,12 @@ Logiciel de bureau de conversion de fichiers tout-en-un. Le nom vient de la chim
 - Répondre en français.
 - Garder le code multiplateforme dès le départ (chemins avec `std::path`, pas de code spécifique Windows hors modules dédiés).
 - Privilégier des dépendances aux licences permissives (MIT / Apache / LGPL) ; signaler toute dépendance GPL.
+
+## Identité visuelle — à respecter pour toute interface
+
+@DESIGN.md
+
+- `maquettes/` : maquettes HTML de référence (`accueil.html`, `file-attente.html`). Les reproduire fidèlement sous forme de composants réutilisables, sans copier le HTML tel quel.
+- `assets/` : logo et icônes officiels. Ne jamais redessiner ni recomposer le logo.
+- Toutes les couleurs passent par les variables CSS de `src/styles/tokens.css` ; aucune couleur codée en dur.
+- Pour toute interface, suivre `DESIGN.md` et les maquettes ; signaler tout écart plutôt que d'improviser un style.
