@@ -50,6 +50,13 @@ Les maquettes de référence sont dans `maquettes/` (ouvrir dans un navigateur) 
 | Audio (MP3, WAV, FLAC…) | `--ambre` | `--abysse` |
 | Documents (DOCX, PDF, ODT…) | `--braise` | `--abysse` |
 
+### Couleur par outil
+
+| Outil | Couleur | Texte sur la couleur | Où |
+|---|---|---|---|
+| Conversion | `--cobalt` (`--mode-convertir`) | blanc | contour de la zone de dépôt, segment actif de la bascule |
+| Compression | `--braise` (`--mode-compresser`) | `--abysse` | contour de la zone de dépôt, segment actif, curseur et valeurs de compression |
+
 ### États
 
 - Succès : texte `--menthe` sur fond `--menthe-fond`, icône coche.
@@ -136,4 +143,5 @@ Les maquettes de référence sont dans `maquettes/` (ouvrir dans un navigateur) 
 ## Mouvement
 
 - Transitions courtes (150–200 ms, `ease-out`) sur les survols et les changements d'état.
+- Écran de démarrage (~2 s) : le logo complet s'assemble (les trois formes tombent l'une après l'autre, puis le mot glisse en place) en animant les calques du SVG officiel, sans le redessiner.
 - Respecter `prefers-reduced-motion`.

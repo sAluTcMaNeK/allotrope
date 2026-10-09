@@ -9,6 +9,13 @@
   import { Copy, Minus, Settings, Square, X } from "@lucide/svelte";
   import logo from "../../assets/allotrope-logo-sans-lisere.svg";
 
+  interface Props {
+    /** Vrai quand l'écran Paramètres est affiché. */
+    parametresActif: boolean;
+    onparametres: () => void;
+  }
+  let { parametresActif, onparametres }: Props = $props();
+
   const fenetre = getCurrentWindow();
   let agrandie = $state(false);
 
@@ -31,7 +38,13 @@
   </div>
 
   <div class="actions">
-    <button class="parametres" aria-label="Paramètres">
+    <button
+      class="parametres"
+      class:actif={parametresActif}
+      aria-label="Paramètres"
+      aria-pressed={parametresActif}
+      onclick={onparametres}
+    >
       <Settings size={20} strokeWidth={2.2} />
     </button>
     <button class="controle" aria-label="Réduire" onclick={() => fenetre.minimize()}>
@@ -105,9 +118,16 @@
     color: var(--givre);
   }
 
-  .parametres:hover {
+  .parametres:hover:not(.actif) {
     border-color: var(--ligne-forte);
     background: var(--surface-active);
+  }
+
+  /* Même traitement que l'élément actif de la barre latérale */
+  .parametres.actif {
+    border-color: var(--givre);
+    background: var(--cobalt);
+    color: var(--blanc);
   }
 
   .controle {

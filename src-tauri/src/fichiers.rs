@@ -1,5 +1,6 @@
 //! Analyse des fichiers reçus par l'interface (glisser-déposer ou sélecteur de fichiers).
 
+use crate::compression::compressible;
 use crate::conversion::{formats_sortie, FormatImage};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -31,6 +32,8 @@ pub struct InfoFichier {
     pub dimensions: Option<(u32, u32)>,
     /// Formats de conversion proposés, le format par défaut en premier (vide si non convertible).
     pub formats_sortie: Vec<FormatImage>,
+    /// Vrai si le fichier peut être compressé.
+    pub compressible: bool,
 }
 
 /// Déduit la famille d'un fichier à partir de son extension.
@@ -73,6 +76,7 @@ fn analyser(chemin: &Path) -> Option<InfoFichier> {
         chemin: chemin.to_path_buf(),
         nom,
         famille: famille_depuis_extension(&extension),
+        compressible: compressible(&extension),
         extension,
         taille: meta.len(),
         dimensions,

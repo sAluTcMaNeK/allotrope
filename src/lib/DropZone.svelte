@@ -1,35 +1,49 @@
 <!--
-  Zone de dépôt de l'écran d'accueil.
+  Zone de dépôt. Le contour indique l'outil actif : bleu Cobalt pour convertir, orange Braise pour compresser.
   Le glisser-déposer lui-même est écouté au niveau de la fenêtre (App.svelte) :
   ce composant ne fait qu'afficher l'état `survol`.
 -->
 <script lang="ts">
   import { Folder } from "@lucide/svelte";
   import formes from "../../assets/allotrope-formes.svg";
-  import { FAMILLES } from "./fichiers";
+  import { FAMILLES, LISTE_FAMILLES, type Famille, type Mode } from "./fichiers";
 
   interface Props {
+    mode: Mode;
+    /** Famille acceptée, ou `null` pour tous les types de fichiers. */
+    famille: Famille | null;
     survol: boolean;
     onparcourir: () => void;
   }
-  let { survol, onparcourir }: Props = $props();
+  let { mode, famille, survol, onparcourir }: Props = $props();
+
+  const familles = $derived(famille ? [FAMILLES[famille]] : LISTE_FAMILLES.map(([, f]) => f));
+  const titre = $derived.by(() => {
+    if (survol) return "Déposez pour ajouter";
+    return famille ? `Glissez vos ${FAMILLES[famille].nom} ici` : "Glissez vos fichiers ici";
+  });
+  const aide = $derived(
+    mode === "convertir"
+      ? "Allotrope détecte le format et vous propose les conversions possibles."
+      : "Allotrope réduit le poids de vos fichiers en gardant leur format.",
+  );
 </script>
 
-<div class="zone" class:survol>
+<div class="zone" style:--contour={`var(--mode-${mode})`} class:survol>
   <img src={formes} alt="" width="132" height="66" draggable="false" />
   <div class="textes">
-    <div class="titre">{survol ? "Déposez pour ajouter" : "Glissez vos fichiers ici"}</div>
-    <div class="aide">Allotrope détecte le format et vous propose les conversions possibles.</div>
+    <div class="titre">{titre}</div>
+    <div class="aide">{aide}</div>
   </div>
   <button class="parcourir" onclick={onparcourir}>
     <Folder size={18} strokeWidth={2.6} />
     Parcourir les fichiers
   </button>
   <div class="formats">
-    {#each Object.values(FAMILLES) as famille (famille.libelle)}
+    {#each familles as f (f.libelle)}
       <div class="format">
-        <span class="carre" style:background={famille.couleur}></span>
-        {famille.formats}
+        <span class="carre" style:background={f.couleur}></span>
+        {f.formats}
       </div>
     {/each}
   </div>
@@ -37,7 +51,7 @@
 
 <style>
   .zone {
-    border: 3px dashed var(--azur);
+    border: 3px dashed var(--contour);
     border-radius: 32px;
     background: var(--surface);
     padding: 48px 32px;

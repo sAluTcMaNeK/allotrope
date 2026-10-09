@@ -1,3 +1,4 @@
+mod compression;
 mod conversion;
 mod fichiers;
 
@@ -11,7 +12,8 @@ pub fn run() {
         // Commandes Rust accessibles depuis l'interface avec `invoke`
         .invoke_handler(tauri::generate_handler![
             fichiers::analyser_fichiers,
-            conversion::convertir_image
+            conversion::convertir_image,
+            compression::compresser_image
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");

@@ -1,41 +1,62 @@
-<!-- Carte d'un fichier dans la file d'attente : choix du format et état de la conversion. -->
+<!-- Carte d'un fichier dans la file d'attente : choix du format (conversion) et état du traitement. -->
 <script lang="ts">
   import { ArrowRight, Check, ChevronDown, Folder, LoaderCircle, X } from "@lucide/svelte";
   import {
     FAMILLES,
     LIBELLES_FORMAT,
     formaterTaille,
+    traitable,
     type ElementFile,
     type FormatImage,
+    type Mode,
+    type TypeCompression,
   } from "./fichiers";
 
   interface Props {
     element: ElementFile;
+    mode: Mode;
+    /** Réglage de compression utilisé (pour le message « déjà sous la cible »). */
+    typeCompression: TypeCompression;
     onformat: (format: FormatImage) => void;
     onretirer: () => void;
     onouvrir: () => void;
   }
-  let { element, onformat, onretirer, onouvrir }: Props = $props();
+  let { element, mode, typeCompression, onformat, onretirer, onouvrir }: Props = $props();
 
   const info = $derived(element.info);
   const famille = $derived(info.famille ? FAMILLES[info.famille] : null);
   // Le badge affiche au plus 4 lettres (« JPEG », « DOCX »)
   const badge = $derived(info.extension.slice(0, 4).toUpperCase() || "?");
+  const actif = $derived(traitable(element, mode));
+  const dejaOptimise = $derived(element.etat === "termine" && element.resultat?.chemin === null);
 
   const meta = $derived.by(() => {
     const taille = formaterTaille(info.taille);
-    if (element.etat === "termine" && element.resultat && element.format) {
-      return `${taille} → ${LIBELLES_FORMAT[element.format]} · ${formaterTaille(element.resultat.taille)}`;
+    const resultat = element.resultat;
+    if (element.etat === "termine" && resultat) {
+      if (resultat.chemin === null) {
+        return typeCompression === "taille" ? `${taille} · aucune compression nécessaire` : `${taille} · aucun gain possible`;
+      }
+      if (mode === "convertir" && element.format) {
+        return `${taille} → ${LIBELLES_FORMAT[element.format]} · ${formaterTaille(resultat.taille)}`;
+      }
+      const gain = Math.round((1 - resultat.taille / info.taille) * 100);
+      return `${taille} → ${formaterTaille(resultat.taille)} · −${gain} %`;
     }
     return info.dimensions ? `${taille} · ${info.dimensions[0]} × ${info.dimensions[1]}` : taille;
   });
 
-  const nonPrisEnCharge = $derived(
-    famille ? "Pas encore pris en charge" : "Format non pris en charge",
-  );
+  // Message affiché quand le fichier ne peut pas être traité par l'outil actif
+  const indisponible = $derived.by(() => {
+    if (!famille) return "Format non pris en charge";
+    // Image convertible, mais le format demandé pour le lot est déjà le sien
+    if (mode === "convertir" && info.formatsSortie.length > 0) return "Déjà dans ce format";
+    if (info.famille !== "image") return "Bientôt disponible";
+    return "Pas encore pris en charge";
+  });
 </script>
 
-<div class="carte">
+<div class="carte" class:inactive={!actif}>
   <div
     class="badge"
     class:inconnu={!famille}
@@ -53,15 +74,18 @@
     {/if}
   </div>
 
-  {#if element.format && element.etat !== "termine"}
+  {#if mode === "convertir" && info.formatsSortie.length > 0 && element.etat !== "termine"}
     <span class="fleche"><ArrowRight size={20} strokeWidth={2.6} /></span>
     <label class="selecteur">
       <select
         aria-label="Format de sortie"
-        value={element.format}
+        value={element.format ?? ""}
         disabled={element.etat === "encours"}
         onchange={(e) => onformat(e.currentTarget.value as FormatImage)}
       >
+        {#if !element.format}
+          <option value="" disabled>Choisir…</option>
+        {/if}
         {#each info.formatsSortie as format (format)}
           <option value={format}>{LIBELLES_FORMAT[format]}</option>
         {/each}
@@ -70,8 +94,10 @@
     </label>
   {/if}
 
-  {#if element.etat === "termine"}
-    <div class="succes">
+  {#if dejaOptimise}
+    <div class="pastille neutre">{typeCompression === "taille" ? "Déjà sous la cible" : "Déjà optimisé"}</div>
+  {:else if element.etat === "termine"}
+    <div class="pastille succes">
       <Check size={16} strokeWidth={3} />
       Terminé
     </div>
@@ -81,12 +107,12 @@
   {:else if element.etat === "encours"}
     <div class="etat">
       <span class="rotation"><LoaderCircle size={16} strokeWidth={2.6} /></span>
-      Conversion…
+      {mode === "convertir" ? "Conversion…" : "Compression…"}
     </div>
   {:else if element.etat === "erreur"}
     <div class="etat echec">Échec</div>
   {:else}
-    <div class="etat">{element.format ? "En attente" : nonPrisEnCharge}</div>
+    <div class="etat">{actif ? "En attente" : indisponible}</div>
   {/if}
 
   {#if element.etat !== "encours"}
@@ -105,6 +131,12 @@
     border-radius: 22px;
     border: 2px solid var(--ligne);
     background: var(--surface);
+  }
+
+  /* Fichier que l'outil actif ne sait pas (encore) traiter */
+  .carte.inactive .badge,
+  .carte.inactive .infos {
+    opacity: 0.6;
   }
 
   .badge {
@@ -230,17 +262,26 @@
     }
   }
 
-  .succes {
+  .pastille {
     display: flex;
     align-items: center;
     gap: 8px;
     height: 36px;
     padding: 0 14px;
     border-radius: 999px;
-    background: var(--menthe-fond);
-    color: var(--menthe);
     font-size: 13px;
     font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .pastille.succes {
+    background: var(--menthe-fond);
+    color: var(--menthe);
+  }
+
+  .pastille.neutre {
+    background: var(--abysse);
+    color: var(--texte-secondaire);
   }
 
   /* Bouton « Icône seule » de la charte */

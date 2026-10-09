@@ -1,10 +1,11 @@
-//! Conversion d'images raster (JPEG, PNG, WebP) avec la crate `image`, entièrement en local.
+//! Conversion d'images raster (JPEG, PNG, WebP), entièrement en local.
+//! Les fonctions `lire`, `encoder` et `enregistrer` sont aussi utilisées par le module `compression`.
 
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Rgb, RgbImage};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{BufWriter, ErrorKind, Write};
+use std::io::{Cursor, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
 /// Formats d'image que l'on sait produire.
@@ -17,7 +18,7 @@ pub enum FormatImage {
 }
 
 impl FormatImage {
-    fn extension(self) -> &'static str {
+    pub fn extension(self) -> &'static str {
         match self {
             FormatImage::Jpeg => "jpg",
             FormatImage::Png => "png",
@@ -25,7 +26,8 @@ impl FormatImage {
         }
     }
 
-    fn depuis_extension(extension: &str) -> Option<Self> {
+    /// Format correspondant à une extension (en minuscules), s'il fait partie des formats produits.
+    pub fn depuis_extension(extension: &str) -> Option<Self> {
         match extension {
             "jpg" | "jpeg" => Some(FormatImage::Jpeg),
             "png" => Some(FormatImage::Png),
@@ -81,31 +83,24 @@ pub fn convertir(
     format: FormatImage,
     qualite: u8,
 ) -> Result<ResultatConversion, String> {
-    let image = lire(source)?;
+    let originaux = std::fs::read(source).map_err(|e| format!("Impossible d'ouvrir le fichier : {e}"))?;
+    let image = lire(&originaux)?;
+    let octets = encoder(&image, format, qualite)?;
+    let chemin = enregistrer(dossier, &nom_sans_extension(source), format.extension(), &octets)?;
+    Ok(ResultatConversion { chemin, taille: octets.len() as u64 })
+}
 
-    std::fs::create_dir_all(dossier)
-        .map_err(|e| format!("Impossible de créer le dossier de destination : {e}"))?;
-    let nom = source
+/// Nom du fichier sans son extension (« photo » pour « photo.png »).
+pub fn nom_sans_extension(chemin: &Path) -> String {
+    chemin
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "image".into());
-    let (sortie, fichier) = creer_fichier_libre(dossier, &nom, format.extension())
-        .map_err(|e| format!("Impossible de créer le fichier de sortie : {e}"))?;
-
-    if let Err(e) = ecrire(&image, fichier, format, qualite) {
-        // Ne pas laisser de fichier à moitié écrit
-        let _ = std::fs::remove_file(&sortie);
-        return Err(format!("Échec de l'encodage : {e}"));
-    }
-
-    let taille = std::fs::metadata(&sortie).map(|m| m.len()).unwrap_or(0);
-    Ok(ResultatConversion { chemin: sortie, taille })
+        .unwrap_or_else(|| "image".into())
 }
 
 /// Décode une image en tenant compte de l'orientation EXIF (photos de téléphone).
-fn lire(source: &Path) -> Result<DynamicImage, String> {
-    let mut decodeur = ImageReader::open(source)
-        .map_err(|e| format!("Impossible d'ouvrir le fichier : {e}"))?
+pub fn lire(octets: &[u8]) -> Result<DynamicImage, String> {
+    let mut decodeur = ImageReader::new(Cursor::new(octets))
         .with_guessed_format()
         .map_err(|e| format!("Impossible de lire le fichier : {e}"))?
         .into_decoder()
@@ -117,6 +112,49 @@ fn lire(source: &Path) -> Result<DynamicImage, String> {
         image.apply_orientation(orientation);
     }
     Ok(image)
+}
+
+/// Encode une image en mémoire. `qualite` (1 à 100) s'applique au JPEG et au WebP.
+pub fn encoder(image: &DynamicImage, format: FormatImage, qualite: u8) -> Result<Vec<u8>, String> {
+    let qualite = qualite.clamp(1, 100);
+    let mut octets = Vec::new();
+    let resultat = match format {
+        FormatImage::Jpeg => {
+            // Le JPEG ne gère pas la transparence
+            let rgb = DynamicImage::ImageRgb8(aplatir_sur_blanc(image));
+            rgb.write_with_encoder(JpegEncoder::new_with_quality(&mut octets, qualite))
+        }
+        FormatImage::Png => image.write_to(&mut Cursor::new(&mut octets), ImageFormat::Png),
+        FormatImage::Webp => {
+            // libwebp (crate `webp`) : compression avec perte, bien plus légère que le WebP sans perte
+            let memoire = if image.color().has_alpha() {
+                let rgba = image.to_rgba8();
+                webp::Encoder::from_rgba(&rgba, rgba.width(), rgba.height()).encode(qualite as f32)
+            } else {
+                let rgb = image.to_rgb8();
+                webp::Encoder::from_rgb(&rgb, rgb.width(), rgb.height()).encode(qualite as f32)
+            };
+            octets.extend_from_slice(&memoire);
+            Ok(())
+        }
+    };
+    resultat.map_err(|e| format!("Échec de l'encodage : {e}"))?;
+    Ok(octets)
+}
+
+/// Écrit `octets` dans `dossier/nom.extension` (ou `nom (2).extension`…) et renvoie le chemin choisi.
+pub fn enregistrer(dossier: &Path, nom: &str, extension: &str, octets: &[u8]) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(dossier)
+        .map_err(|e| format!("Impossible de créer le dossier de destination : {e}"))?;
+    let (chemin, mut fichier) = creer_fichier_libre(dossier, nom, extension)
+        .map_err(|e| format!("Impossible de créer le fichier de sortie : {e}"))?;
+    if let Err(e) = fichier.write_all(octets) {
+        // Ne pas laisser de fichier à moitié écrit
+        drop(fichier);
+        let _ = std::fs::remove_file(&chemin);
+        return Err(format!("Échec de l'écriture : {e}"));
+    }
+    Ok(chemin)
 }
 
 /// Crée `nom.ext`, ou `nom (2).ext`, `nom (3).ext`… si le nom est déjà pris.
@@ -137,29 +175,6 @@ fn creer_fichier_libre(dossier: &Path, nom: &str, extension: &str) -> std::io::R
     }
 }
 
-fn ecrire(image: &DynamicImage, fichier: File, format: FormatImage, qualite: u8) -> image::ImageResult<()> {
-    let mut sortie = BufWriter::new(fichier);
-    match format {
-        FormatImage::Jpeg => {
-            // Le JPEG ne gère pas la transparence
-            let rgb = DynamicImage::ImageRgb8(aplatir_sur_blanc(image));
-            rgb.write_with_encoder(JpegEncoder::new_with_quality(&mut sortie, qualite.clamp(1, 100)))?;
-        }
-        FormatImage::Png => image.write_to(&mut sortie, ImageFormat::Png)?,
-        FormatImage::Webp => {
-            // L'encodeur WebP n'accepte que des pixels 8 bits RGB ou RGBA
-            let image8 = if image.color().has_alpha() {
-                DynamicImage::ImageRgba8(image.to_rgba8())
-            } else {
-                DynamicImage::ImageRgb8(image.to_rgb8())
-            };
-            image8.write_to(&mut sortie, ImageFormat::WebP)?;
-        }
-    }
-    sortie.flush()?;
-    Ok(())
-}
-
 /// Remplace la transparence par du blanc (sinon les zones transparentes deviendraient noires en JPEG).
 fn aplatir_sur_blanc(image: &DynamicImage) -> RgbImage {
     if !image.color().has_alpha() {
@@ -176,12 +191,12 @@ fn aplatir_sur_blanc(image: &DynamicImage) -> RgbImage {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use image::{Rgba, RgbaImage};
 
     /// Dossier temporaire propre à chaque test.
-    fn dossier_test(nom: &str) -> PathBuf {
+    pub fn dossier_test(nom: &str) -> PathBuf {
         let dossier = std::env::temp_dir().join(format!("allotrope-test-{nom}"));
         let _ = std::fs::remove_dir_all(&dossier);
         std::fs::create_dir_all(&dossier).unwrap();

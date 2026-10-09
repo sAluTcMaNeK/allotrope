@@ -32,6 +32,12 @@
   --famille-audio: var(--ambre);
   --famille-document: var(--braise);
 
+  /* Couleur de chaque outil (contour de la zone de dépôt, bascule, curseurs) */
+  --mode-convertir: var(--cobalt);
+  --mode-convertir-texte: var(--blanc);
+  --mode-compresser: var(--braise);
+  --mode-compresser-texte: var(--abysse); /* jamais de blanc sur Braise */
+
   /* Typographie : Nunito embarquée localement (@fontsource-variable/nunito) */
   --police: "Nunito Variable", "Nunito", system-ui, sans-serif;
 
