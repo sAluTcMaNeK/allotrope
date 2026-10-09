@@ -12,7 +12,7 @@
 <polygon points="160,20 190,60 160,100 130,60" fill="none" stroke="#EEF5FF" stroke-width="8.5"/>
 </g></g>
 <g transform="translate(240 0) scale(0.676190) translate(24 4)"><g fill="none" stroke-linecap="round" stroke-linejoin="round">
-<g stroke="#EEF5FF" stroke-width="36">
+<g stroke="#EEF5FF" stroke-width="42">
 <path d="M0 110 a40 40 0 1 0 80 0 a40 40 0 1 0 -80 0 M80 70 V150"/>
 <path d="M112 20 V128 Q112 150 132 150"/>
 <path d="M164 20 V128 Q164 150 184 150"/>

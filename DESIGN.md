@@ -127,7 +127,7 @@ Les maquettes de référence sont dans `maquettes/` (ouvrir dans un navigateur) 
 ## Logo
 
 - `assets/allotrope-logo.svg` : logo complet avec double contour (blanc + liseré noir), fond transparent — pour tout fond.
-- `assets/allotrope-logo-sans-lisere.svg` : logo complet sans le liseré noir extérieur, pour les fonds Abysse de l'interface (barre de titre).
+- `assets/allotrope-logo-sans-lisere.svg` : logo complet sans le liseré noir extérieur, contour blanc du mot légèrement épaissi pour la lisibilité en petite taille ; pour les fonds Abysse de l'interface (barre de titre).
 - `assets/allotrope-formes.svg` : les trois formes seules, sans liseré noir ni fond (zone de dépôt).
 - `assets/allotrope-logo-complet.svg` : logo sur fond Abysse (écran « À propos », écran de démarrage).
 - `assets/allotrope-icon-1024.png` : source des icônes de l'application → `npm run tauri icon assets/allotrope-icon-1024.png`.
