@@ -1,0 +1,5 @@
+# Dossier de compilation Rust (volumineux)
+/target/
+
+# Schémas générés automatiquement par Tauri
+/gen/schemas

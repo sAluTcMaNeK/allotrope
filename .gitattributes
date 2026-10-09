@@ -1,0 +1,7 @@
+# Fins de ligne Unix (LF) partout, quel que soit le système (cohérent avec .editorconfig)
+* text=auto eol=lf
+
+# Fichiers binaires : ne jamais les modifier
+*.png binary
+*.ico binary
+*.icns binary
