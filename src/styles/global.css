@@ -1,0 +1,57 @@
+/* Styles de base communs à toute l'application. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--abysse);
+  color: var(--givre);
+  font-family: var(--police);
+  font-size: 15px;
+  font-weight: 600;
+  -webkit-font-smoothing: antialiased;
+  /* Une application de bureau ne doit pas se comporter comme une page web */
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--lien);
+}
+
+a:hover {
+  color: var(--givre);
+}
+
+:focus-visible {
+  outline: 3px solid var(--azur);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

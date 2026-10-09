@@ -1,0 +1,40 @@
+/*
+ * Jetons de design d'Allotrope (voir DESIGN.md).
+ * Toutes les couleurs de l'interface passent par ces variables : aucune couleur codée en dur ailleurs.
+ */
+:root {
+  /* Bleus — dominante */
+  --abysse: #0a1a3f; /* fond de l'application */
+  --surface: #0e2150; /* cartes, panneaux, zone de dépôt */
+  --surface-active: #12296a; /* carte sélectionnée */
+  --ligne: #1c2e5c; /* bordures discrètes, séparateurs */
+  --ligne-forte: #2b4278; /* bordures de boutons secondaires, pointillés */
+  --cobalt: #1f5bff; /* couleur de marque, élément actif */
+  --azur: #4c9bff; /* images, accents bleus clairs */
+  --lagon: #14c4e6;
+  --givre: #eef5ff; /* texte principal, contours marqués */
+  --texte-secondaire: #a9bce0;
+  --lien: #8ec2ff;
+  --blanc: #ffffff; /* texte sur Cobalt et Améthyste */
+
+  /* Accents — par petites touches */
+  --braise: #ff6a3d; /* documents, bouton principal */
+  --amethyste: #7b3ff2; /* vidéo */
+  --amethyste-clair: #9a72f6; /* barre de progression vidéo */
+  --ambre: #ffb020; /* audio */
+  --pivoine: #ff4f7b; /* réserve (erreurs secondaires, nouveautés) */
+  --menthe: #3ddc97; /* succès, « 100 % local » */
+  --menthe-fond: #123a3a; /* fond des pastilles de succès */
+
+  /* Couleur par famille de fichiers */
+  --famille-image: var(--azur);
+  --famille-video: var(--amethyste);
+  --famille-audio: var(--ambre);
+  --famille-document: var(--braise);
+
+  /* Typographie : Nunito embarquée localement (@fontsource-variable/nunito) */
+  --police: "Nunito Variable", "Nunito", system-ui, sans-serif;
+
+  /* Mouvement */
+  --transition: 180ms ease-out;
+}

@@ -1,4 +1,7 @@
 import { mount } from "svelte";
+import "@fontsource-variable/nunito";
+import "./styles/tokens.css";
+import "./styles/global.css";
 import App from "./App.svelte";
 
 const app = mount(App, {
