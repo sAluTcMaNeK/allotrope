@@ -50,7 +50,6 @@
     image: "jpeg",
     video: "mp4",
     audio: "mp3",
-    document: "pdf",
   });
   // Réglages de compression de la session, initialisés avec les valeurs par défaut des paramètres
   let compression = $state<OptionsCompression>({ ...reglages.compression });

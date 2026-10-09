@@ -18,7 +18,8 @@ pub fn run() {
             pdf::infos_pdf,
             pdf::lire_pdf,
             pdf::assembler_pdf,
-            pdf::images_en_pdf
+            pdf::images_en_pdf,
+            pdf::compresser_pdf
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");

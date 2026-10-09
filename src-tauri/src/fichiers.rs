@@ -12,7 +12,6 @@ pub enum Famille {
     Image,
     Video,
     Audio,
-    Document,
 }
 
 /// Informations sur un fichier, envoyées à l'interface.
@@ -46,7 +45,6 @@ pub fn famille_depuis_extension(extension: &str) -> Option<Famille> {
         "heic" | "heif" | "avif" => Some(Famille::Image),
         e if EXTENSIONS_LISIBLES.contains(&e) => Some(Famille::Image),
         "mp3" | "wav" | "flac" | "ogg" | "m4a" | "aac" | "opus" => Some(Famille::Audio),
-        "pdf" | "docx" | "doc" | "odt" | "rtf" => Some(Famille::Document),
         _ => None,
     }
 }
@@ -106,7 +104,8 @@ mod tests {
         assert_eq!(famille_depuis_extension("gif"), Some(Famille::Video));
         assert_eq!(famille_depuis_extension("MOV"), Some(Famille::Video));
         assert_eq!(famille_depuis_extension("flac"), Some(Famille::Audio));
-        assert_eq!(famille_depuis_extension("docx"), Some(Famille::Document));
+        // Les PDF ont leur propre page (Outils PDF) : pas de famille
+        assert_eq!(famille_depuis_extension("pdf"), None);
         assert_eq!(famille_depuis_extension("exe"), None);
         assert_eq!(famille_depuis_extension(""), None);
     }

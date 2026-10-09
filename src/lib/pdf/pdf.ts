@@ -48,6 +48,19 @@ export function imagesEnPdf(
   return invoke("images_en_pdf", { images, dossier, nom, formatPage, marge });
 }
 
+export type NiveauPdf = "legere" | "recommandee" | "forte";
+
+/** Miroir de la structure Rust `ResultatCompressionPdf`. `chemin` est `null` si aucun gain n'était possible. */
+export interface ResultatCompressionPdf {
+  chemin: string | null;
+  taille: number;
+  images: number;
+}
+
+export function compresserPdf(source: string, dossier: string, niveau: NiveauPdf): Promise<ResultatCompressionPdf> {
+  return invoke("compresser_pdf", { source, dossier, niveau });
+}
+
 /** Ouvre un PDF avec pdf.js pour en afficher les pages (les octets sont lus par le cœur Rust). */
 export async function ouvrirPdf(chemin: string): Promise<PDFDocumentProxy> {
   const octets = await invoke<ArrayBuffer>("lire_pdf", { chemin });

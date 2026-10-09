@@ -48,7 +48,7 @@ Les maquettes de référence sont dans `maquettes/` (ouvrir dans un navigateur) 
 | Images (JPG, PNG, WEBP, SVG, HEIC…) | `--azur` | `--abysse` |
 | Vidéo (MP4, MOV, MKV, GIF…) | `--amethyste` | blanc |
 | Audio (MP3, WAV, FLAC…) | `--ambre` | `--abysse` |
-| Documents (DOCX, PDF, ODT…) | `--braise` | `--abysse` |
+| PDF (page « Outils PDF » ; plus de catégorie Documents dans la barre latérale) | `--braise` (`--famille-document`) | `--abysse` |
 
 ### Couleur par outil
 

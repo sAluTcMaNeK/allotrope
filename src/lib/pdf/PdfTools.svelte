@@ -5,6 +5,7 @@
   import FusionTool from "./FusionTool.svelte";
   import PagesTool from "./PagesTool.svelte";
   import ImagesTool from "./ImagesTool.svelte";
+  import CompressionPdfTool from "./CompressionPdfTool.svelte";
 
   type IdOutil = "fusionner" | "reorganiser" | "supprimer" | "images" | "compresser" | "en-images" | "word";
 
@@ -47,7 +48,6 @@
       titre: "Compresser un PDF",
       description: "Allégez un PDF pour l'envoyer par e-mail.",
       icone: Shrink,
-      bientot: "Bientôt",
     },
     {
       id: "en-images",
@@ -77,6 +77,8 @@
   {/key}
 {:else if ouvert === "images"}
   <ImagesTool onretour={retour} />
+{:else if ouvert === "compresser"}
+  <CompressionPdfTool onretour={retour} />
 {:else}
   <div class="accueil">
     <header>

@@ -48,6 +48,7 @@
 
   // Message affiché quand le fichier ne peut pas être traité par l'outil actif
   const indisponible = $derived.by(() => {
+    if (info.extension === "pdf") return "Voir les Outils PDF";
     if (!famille) return "Format non pris en charge";
     // Image convertible, mais le format demandé pour le lot est déjà le sien
     if (mode === "convertir" && info.formatsSortie.length > 0) return "Déjà dans ce format";

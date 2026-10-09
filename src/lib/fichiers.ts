@@ -1,7 +1,8 @@
 // Lien avec les modules Rust `fichiers`, `conversion` et `compression` (src-tauri/src/) et outils d'affichage.
 import { invoke } from "@tauri-apps/api/core";
 
-export type Famille = "image" | "video" | "audio" | "document";
+/** Familles de fichiers de la barre latérale (les PDF ont leur propre page : Outils PDF). */
+export type Famille = "image" | "video" | "audio";
 export type FormatImage = "jpeg" | "png" | "webp" | "bmp" | "tiff" | "gif" | "ico" | "tga" | "qoi";
 export type Mode = "convertir" | "compresser";
 
@@ -198,17 +199,6 @@ export const FAMILLES: Record<
     ],
     conversion: "La conversion audio arrive avec le module vidéo et audio (FFmpeg).",
     compression: "La compression audio arrive avec le module vidéo et audio (FFmpeg).",
-  },
-  document: {
-    libelle: "Documents",
-    nom: "documents",
-    couleur: "var(--famille-document)",
-    texte: "var(--abysse)",
-    formats: "DOCX · PDF · ODT",
-    extensions: ["pdf", "docx", "doc", "odt", "rtf"],
-    cibles: [{ id: "pdf", libelle: "PDF" }],
-    conversion: "La conversion des documents arrive avec le module documents.",
-    compression: "La compression des PDF arrive avec le module documents.",
   },
 };
 
