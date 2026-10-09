@@ -2,7 +2,7 @@
 <script lang="ts">
   import { Plus } from "@lucide/svelte";
   import FileCard from "./FileCard.svelte";
-  import type { ElementFile, FormatImage, Mode, TypeCompression } from "./fichiers";
+  import type { ElementFile, FormatSortie, Mode, TypeCompression } from "./fichiers";
 
   interface Props {
     elements: ElementFile[];
@@ -11,10 +11,11 @@
     survol: boolean;
     onajouter: () => void;
     onretirer: (chemin: string) => void;
-    onformat: (chemin: string, format: FormatImage) => void;
+    onformat: (chemin: string, format: FormatSortie) => void;
+    onannuler: (chemin: string) => void;
     onouvrir: (chemin: string) => void;
   }
-  let { elements, mode, typeCompression, survol, onajouter, onretirer, onformat, onouvrir }: Props =
+  let { elements, mode, typeCompression, survol, onajouter, onretirer, onformat, onouvrir, onannuler }: Props =
     $props();
 </script>
 
@@ -38,6 +39,7 @@
         {typeCompression}
         onformat={(format) => onformat(element.info.chemin, format)}
         onretirer={() => onretirer(element.info.chemin)}
+        onannuler={() => onannuler(element.info.chemin)}
         onouvrir={() => element.resultat?.chemin && onouvrir(element.resultat.chemin)}
       />
     {/each}

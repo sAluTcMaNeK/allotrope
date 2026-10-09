@@ -25,6 +25,8 @@ oxipng = { version = "10.2.1", default-features = false, features = ["parallel"]
 resvg = "0.48"
 jxl-oxide = { version = "0.12", features = ["image"] }
 lopdf = "0.45"
+tauri-plugin-shell = "2"
+regex = "1"
 
 # En mode développement, les dépendances (image, webp, oxipng…) sont tout de même optimisées :
 # sans cela, compresser une photo prend plusieurs secondes. Notre propre code reste en mode debug.

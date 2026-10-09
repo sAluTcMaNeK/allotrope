@@ -48,7 +48,13 @@
         </span>
       </div>
     {:else if !indisponible}
-      <CompressionFields id="file" options={compression} onchange={oncompression} {desactive} />
+      <CompressionFields id="file" options={compression} onchange={oncompression} {desactive} {famille} />
+      {#if famille === "audio"}
+        <p class="note">
+          <Info size={16} strokeWidth={2.6} />
+          Les fichiers sans perte (WAV, FLAC…) ne se compressent pas : convertissez-les en MP3, M4A ou OPUS.
+        </p>
+      {/if}
     {/if}
 
     {#if indisponible}

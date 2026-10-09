@@ -4,13 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copier-pdfjs.mjs",
+    "predev": "node scripts/copier-pdfjs.mjs && node scripts/telecharger-ffmpeg.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/copier-pdfjs.mjs",
+    "prebuild": "node scripts/copier-pdfjs.mjs && node scripts/telecharger-ffmpeg.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "ffmpeg": "node scripts/telecharger-ffmpeg.mjs"
   },
   "dependencies": {
     "@fontsource-variable/nunito": "^5.3.0",

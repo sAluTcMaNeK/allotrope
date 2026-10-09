@@ -2,8 +2,10 @@
 
 use crate::compression::compressible;
 use crate::conversion::{formats_sortie, FormatImage, EXTENSIONS_LISIBLES};
+use crate::media::{self, format_compression, formats_sortie_media, FormatMedia, EXTENSIONS_AUDIO, EXTENSIONS_VIDEO};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use tauri::AppHandle;
 
 /// Grande famille d'un fichier : détermine sa couleur dans l'interface et les conversions possibles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -12,6 +14,14 @@ pub enum Famille {
     Image,
     Video,
     Audio,
+}
+
+/// Format de sortie proposé : image ou audio / vidéo. `untagged` : envoyé tel quel (« png », « mp4 »…).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+pub enum FormatSortie {
+    Image(FormatImage),
+    Media(FormatMedia),
 }
 
 /// Informations sur un fichier, envoyées à l'interface.
@@ -27,10 +37,12 @@ pub struct InfoFichier {
     pub taille: u64,
     /// `None` si le format n'est pas reconnu (devient `null` côté interface).
     pub famille: Option<Famille>,
-    /// Largeur et hauteur en pixels, pour les images lisibles.
+    /// Largeur et hauteur en pixels (images lisibles et vidéos).
     pub dimensions: Option<(u32, u32)>,
+    /// Durée en secondes (audio et vidéo).
+    pub duree: Option<f64>,
     /// Formats de conversion proposés, le format par défaut en premier (vide si non convertible).
-    pub formats_sortie: Vec<FormatImage>,
+    pub formats_sortie: Vec<FormatSortie>,
     /// Vrai si le fichier peut être compressé.
     pub compressible: bool,
 }
@@ -39,17 +51,18 @@ pub struct InfoFichier {
 pub fn famille_depuis_extension(extension: &str) -> Option<Famille> {
     let extension = extension.to_lowercase();
     match extension.as_str() {
-        // Le GIF est classé en vidéo (souvent animé, voir DESIGN.md), même s'il peut être converti en image
-        "mp4" | "mov" | "mkv" | "avi" | "webm" | "m4v" | "gif" => Some(Famille::Video),
+        // Le GIF est classé en vidéo (souvent animé, voir DESIGN.md)
+        e if EXTENSIONS_VIDEO.contains(&e) => Some(Famille::Video),
+        e if EXTENSIONS_AUDIO.contains(&e) => Some(Famille::Audio),
         // HEIC / AVIF : reconnus mais pas encore lisibles (libheif / libavif plus tard)
         "heic" | "heif" | "avif" => Some(Famille::Image),
         e if EXTENSIONS_LISIBLES.contains(&e) => Some(Famille::Image),
-        "mp3" | "wav" | "flac" | "ogg" | "m4a" | "aac" | "opus" => Some(Famille::Audio),
         _ => None,
     }
 }
 
 /// Analyse un chemin. Renvoie `None` pour un dossier ou un chemin illisible.
+/// La durée et la définition des vidéos sont ajoutées ensuite par FFmpeg (`analyser_fichiers`).
 fn analyser(chemin: &Path) -> Option<InfoFichier> {
     let meta = std::fs::metadata(chemin).ok()?;
     if !meta.is_file() {
@@ -64,23 +77,31 @@ fn analyser(chemin: &Path) -> Option<InfoFichier> {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
+    let famille = famille_depuis_extension(&extension);
 
-    let formats_sortie = formats_sortie(&extension);
-    // Ne lit que l'en-tête de l'image : rapide même pour une grosse photo
-    let dimensions = if formats_sortie.is_empty() {
-        None
-    } else {
-        image::image_dimensions(chemin).ok()
+    let (formats_sortie, compressible, dimensions) = match famille {
+        Some(Famille::Video | Famille::Audio) => (
+            formats_sortie_media(&extension).into_iter().map(FormatSortie::Media).collect(),
+            format_compression(&extension).is_some(),
+            None,
+        ),
+        _ => {
+            let formats: Vec<FormatSortie> = formats_sortie(&extension).into_iter().map(FormatSortie::Image).collect();
+            // Ne lit que l'en-tête de l'image : rapide même pour une grosse photo
+            let dimensions = if formats.is_empty() { None } else { image::image_dimensions(chemin).ok() };
+            (formats, compressible(&extension), dimensions)
+        }
     };
 
     Some(InfoFichier {
         chemin: chemin.to_path_buf(),
         nom,
-        famille: famille_depuis_extension(&extension),
-        compressible: compressible(&extension),
+        famille,
+        compressible,
         extension,
         taille: meta.len(),
         dimensions,
+        duree: None,
         formats_sortie,
     })
 }
@@ -88,8 +109,16 @@ fn analyser(chemin: &Path) -> Option<InfoFichier> {
 /// Commande appelée depuis l'interface : `invoke("analyser_fichiers", { chemins })`.
 /// Elle est `async` pour s'exécuter hors du fil principal et ne jamais figer la fenêtre.
 #[tauri::command]
-pub async fn analyser_fichiers(chemins: Vec<PathBuf>) -> Vec<InfoFichier> {
-    chemins.iter().filter_map(|c| analyser(c)).collect()
+pub async fn analyser_fichiers(app: AppHandle, chemins: Vec<PathBuf>) -> Vec<InfoFichier> {
+    let mut infos: Vec<InfoFichier> = chemins.iter().filter_map(|c| analyser(c)).collect();
+    // Audio et vidéo : durée et définition lues par FFmpeg (quelques centièmes de seconde par fichier)
+    for info in infos.iter_mut().filter(|i| matches!(i.famille, Some(Famille::Video | Famille::Audio))) {
+        if let Ok(media) = media::infos(&app, &info.chemin).await {
+            info.duree = media.duree;
+            info.dimensions = media.largeur.zip(media.hauteur);
+        }
+    }
+    infos
 }
 
 #[cfg(test)]

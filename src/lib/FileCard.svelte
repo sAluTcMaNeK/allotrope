@@ -4,10 +4,11 @@
   import {
     FAMILLES,
     LIBELLES_FORMAT,
+    estMedia,
     formaterTaille,
     traitable,
     type ElementFile,
-    type FormatImage,
+    type FormatSortie,
     type Mode,
     type TypeCompression,
   } from "./fichiers";
@@ -17,11 +18,13 @@
     mode: Mode;
     /** Réglage de compression utilisé (pour le message « déjà sous la cible »). */
     typeCompression: TypeCompression;
-    onformat: (format: FormatImage) => void;
+    onformat: (format: FormatSortie) => void;
     onretirer: () => void;
     onouvrir: () => void;
+    /** Arrête le traitement en cours (audio / vidéo). */
+    onannuler: () => void;
   }
-  let { element, mode, typeCompression, onformat, onretirer, onouvrir }: Props = $props();
+  let { element, mode, typeCompression, onformat, onretirer, onouvrir, onannuler }: Props = $props();
 
   const info = $derived(element.info);
   const famille = $derived(info.famille ? FAMILLES[info.famille] : null);
@@ -29,6 +32,19 @@
   const badge = $derived(info.extension.slice(0, 4).toUpperCase() || "?");
   const actif = $derived(traitable(element, mode));
   const dejaOptimise = $derived(element.etat === "termine" && element.resultat?.chemin === null);
+  const media = $derived(estMedia(info));
+  const annule = $derived(element.etat === "erreur" && element.erreur === "Annulé");
+  /** Barre de progression : couleur de la famille (Améthyste clair pour la vidéo, voir DESIGN.md). */
+  const couleurProgression = $derived(info.famille === "video" ? "var(--amethyste-clair)" : famille?.couleur);
+  const pourcentage = $derived(Math.round(element.progression ?? 0));
+
+  /** « 3 min 12 s », « 1 h 05 min ». */
+  function dureeLisible(secondes: number): string {
+    const s = Math.round(secondes);
+    if (s >= 3600) return `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")} min`;
+    if (s >= 60) return `${Math.floor(s / 60)} min ${s % 60} s`;
+    return `${s} s`;
+  }
 
   const meta = $derived.by(() => {
     const taille = formaterTaille(info.taille);
@@ -43,21 +59,26 @@
       const gain = Math.round((1 - resultat.taille / info.taille) * 100);
       return `${taille} → ${formaterTaille(resultat.taille)} · −${gain} %`;
     }
-    return info.dimensions ? `${taille} · ${info.dimensions[0]} × ${info.dimensions[1]}` : taille;
+    const details = [taille];
+    if (info.dimensions) details.push(`${info.dimensions[0]} × ${info.dimensions[1]}`);
+    if (info.duree) details.push(dureeLisible(info.duree));
+    return details.join(" · ");
   });
 
   // Message affiché quand le fichier ne peut pas être traité par l'outil actif
   const indisponible = $derived.by(() => {
     if (info.extension === "pdf") return "Voir les Outils PDF";
     if (!famille) return "Format non pris en charge";
-    // Image convertible, mais le format demandé pour le lot est déjà le sien
+    // Fichier convertible, mais le format demandé pour le lot est déjà le sien
     if (mode === "convertir" && info.formatsSortie.length > 0) return "Déjà dans ce format";
-    if (info.famille !== "image") return "Bientôt disponible";
+    // WAV, FLAC… : les alléger, c'est les convertir (MP3, M4A, OPUS)
+    if (mode === "compresser" && info.famille === "audio") return "Sans perte : à convertir";
     return "Pas encore pris en charge";
   });
 </script>
 
 <div class="carte" class:inactive={!actif}>
+  <div class="ligne">
   <div
     class="badge"
     class:inconnu={!famille}
@@ -82,7 +103,7 @@
         aria-label="Format de sortie"
         value={element.format ?? ""}
         disabled={element.etat === "encours"}
-        onchange={(e) => onformat(e.currentTarget.value as FormatImage)}
+        onchange={(e) => onformat(e.currentTarget.value as FormatSortie)}
       >
         {#if !element.format}
           <option value="" disabled>Choisir…</option>
@@ -105,11 +126,15 @@
     <button class="carre" aria-label="Afficher dans le dossier" onclick={onouvrir}>
       <Folder size={18} strokeWidth={2.4} />
     </button>
+  {:else if element.etat === "encours" && media}
+    <div class="etat fort">{pourcentage} %</div>
   {:else if element.etat === "encours"}
     <div class="etat">
       <span class="rotation"><LoaderCircle size={16} strokeWidth={2.6} /></span>
       {mode === "convertir" ? "Conversion…" : "Compression…"}
     </div>
+  {:else if annule}
+    <div class="etat">Annulé</div>
   {:else if element.etat === "erreur"}
     <div class="etat echec">Échec</div>
   {:else}
@@ -120,18 +145,56 @@
     <button class="carre" aria-label={`Retirer ${info.nom}`} onclick={onretirer}>
       <X size={18} strokeWidth={2.4} />
     </button>
+  {:else if media}
+    <button class="carre" aria-label={`Annuler le traitement de ${info.nom}`} onclick={onannuler}>
+      <X size={18} strokeWidth={2.4} />
+    </button>
+  {/if}
+  </div>
+
+  {#if element.etat === "encours" && media}
+    <!-- Barre de progression de la charte : 12 px, fond Ligne, remplissage couleur de la famille -->
+    <div
+      class="progression"
+      role="progressbar"
+      aria-label={`Avancement de ${info.nom}`}
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={pourcentage}
+    >
+      <div class="remplissage" style:width="{element.progression ?? 0}%" style:background={couleurProgression}></div>
+    </div>
   {/if}
 </div>
 
 <style>
   .carte {
     display: flex;
-    align-items: center;
-    gap: 14px;
+    flex-direction: column;
+    gap: 12px;
     padding: 16px;
     border-radius: 22px;
     border: 2px solid var(--ligne);
     background: var(--surface);
+  }
+
+  .ligne {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .progression {
+    height: 12px;
+    border-radius: 999px;
+    background: var(--ligne);
+    overflow: hidden;
+  }
+
+  .remplissage {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 400ms linear;
   }
 
   /* Fichier que l'outil actif ne sait pas (encore) traiter */
@@ -246,6 +309,13 @@
     font-weight: 700;
     color: var(--texte-secondaire);
     text-align: right;
+  }
+
+  /* Pourcentage d'avancement, bien lisible */
+  .etat.fort {
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--givre);
   }
 
   .etat.echec {

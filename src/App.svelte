@@ -21,10 +21,15 @@
     analyserFichiers,
     compresserImage,
     convertirImage,
+    estMedia,
+    operationMedia,
+    traiterMedia,
+    annulerMedia,
     traitable,
     type ElementFile,
     type Famille,
     type FormatImage,
+    type FormatSortie,
     type InfoFichier,
     type Mode,
     type OptionsCompression,
@@ -94,9 +99,9 @@
   }
 
   /** Format de conversion d'un nouveau fichier : celui choisi pour le lot, sinon le premier proposé. */
-  function formatInitial(info: InfoFichier): FormatImage | null {
-    if (famille === "image") {
-      const cible = cibles.image as FormatImage;
+  function formatInitial(info: InfoFichier): FormatSortie | null {
+    if (famille) {
+      const cible = cibles[famille] as FormatSortie;
       return info.formatsSortie.includes(cible) ? cible : null;
     }
     return info.formatsSortie[0] ?? null;
@@ -147,16 +152,15 @@
   function changerCible(cible: string) {
     if (!famille) return;
     cibles[famille] = cible;
-    if (famille !== "image") return;
     for (const element of visibles) {
       if (element.etat === "encours") continue;
-      const format = cible as FormatImage;
+      const format = cible as FormatSortie;
       element.format = element.info.formatsSortie.includes(format) ? format : null;
       reinitialiser(element);
     }
   }
 
-  function changerFormat(chemin: string, format: FormatImage) {
+  function changerFormat(chemin: string, format: FormatSortie) {
     const element = elements.find((e) => e.info.chemin === chemin);
     if (!element) return;
     element.format = format;
@@ -187,31 +191,47 @@
     const qualite = reglages.qualite;
     enCours = true;
 
-    // Chaque « travailleur » prend le fichier suivant tant qu'il en reste
-    let suivant = 0;
-    const travailleur = async () => {
-      while (suivant < aFaire.length) {
-        const element = aFaire[suivant++];
-        // Le fichier a pu être retiré de la file entre-temps
-        if (!elements.some((e) => e.info.chemin === element.info.chemin)) continue;
-        element.etat = "encours";
-        element.erreur = undefined;
-        try {
-          const dossier = await dossierPour(element.info.chemin);
-          element.resultat =
-            outil === "convertir"
-              ? await convertirImage(element.info.chemin, dossier, element.format!, qualite)
-              : await compresserImage(element.info.chemin, dossier, options);
-          element.etat = "termine";
-        } catch (erreur) {
-          element.erreur = String(erreur);
-          element.etat = "erreur";
-        }
+    /** Traite un fichier : image (cœur Rust) ou audio / vidéo (FFmpeg, avec progression). */
+    async function traiter(element: ElementFile) {
+      const dossier = await dossierPour(element.info.chemin);
+      if (estMedia(element.info)) {
+        element.progression = 0;
+        return traiterMedia(element.info.chemin, dossier, operationMedia(element, outil, options), (p) => {
+          element.progression = p;
+        });
       }
-    };
-    await Promise.all(
-      Array.from({ length: Math.min(TRAITEMENTS_PARALLELES, aFaire.length) }, travailleur),
-    );
+      return outil === "convertir"
+        ? convertirImage(element.info.chemin, dossier, element.format as FormatImage, qualite)
+        : compresserImage(element.info.chemin, dossier, options);
+    }
+
+    /** Lance `paralleles` « travailleurs » qui prennent chacun le fichier suivant de `liste`. */
+    async function traiterListe(liste: ElementFile[], paralleles: number) {
+      let suivant = 0;
+      const travailleur = async () => {
+        while (suivant < liste.length) {
+          const element = liste[suivant++];
+          // Le fichier a pu être retiré de la file entre-temps
+          if (!elements.some((e) => e.info.chemin === element.info.chemin)) continue;
+          element.etat = "encours";
+          element.erreur = undefined;
+          try {
+            element.resultat = await traiter(element);
+            element.etat = "termine";
+          } catch (erreur) {
+            element.erreur = String(erreur);
+            element.etat = "erreur";
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(paralleles, liste.length) }, travailleur));
+    }
+
+    // Images : plusieurs à la fois. Audio / vidéo : une à la fois (FFmpeg utilise déjà tous les cœurs).
+    await Promise.all([
+      traiterListe(aFaire.filter((e) => !estMedia(e.info)), TRAITEMENTS_PARALLELES),
+      traiterListe(aFaire.filter((e) => estMedia(e.info)), 1),
+    ]);
     enCours = false;
   }
 
@@ -290,6 +310,7 @@
                 onajouter={parcourir}
                 onretirer={retirer}
                 onformat={changerFormat}
+                onannuler={(chemin) => annulerMedia(chemin)}
                 onouvrir={(chemin) => revealItemInDir(chemin)}
               />
             {/if}

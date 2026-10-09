@@ -296,7 +296,7 @@ pub fn enregistrer(dossier: &Path, nom: &str, extension: &str, octets: &[u8]) ->
 
 /// Crée `nom.ext`, ou `nom (2).ext`, `nom (3).ext`… si le nom est déjà pris.
 /// `create_new` réserve le nom de façon atomique, même si plusieurs conversions tournent en parallèle.
-fn creer_fichier_libre(dossier: &Path, nom: &str, extension: &str) -> std::io::Result<(PathBuf, File)> {
+pub(crate) fn creer_fichier_libre(dossier: &Path, nom: &str, extension: &str) -> std::io::Result<(PathBuf, File)> {
     let mut numero = 1;
     loop {
         let chemin = if numero == 1 {

@@ -1,11 +1,12 @@
 <!--
-  Réglages de compression : par taux (curseur) ou par taille cible, plus la taille maximale.
+  Réglages de compression : par taux (curseur) ou par taille cible, plus les dimensions maximales
+  des images et la définition maximale des vidéos (selon la famille affichée).
   Utilisé au-dessus de la file d'attente et dans les Paramètres (valeurs par défaut).
 -->
 <script lang="ts">
   import { ChevronDown } from "@lucide/svelte";
   import Segmented from "./Segmented.svelte";
-  import { TAILLES_MAX, type OptionsCompression, type Unite } from "./fichiers";
+  import { HAUTEURS_MAX, TAILLES_MAX, type Famille, type OptionsCompression, type Unite } from "./fichiers";
 
   interface Props {
     options: OptionsCompression;
@@ -13,8 +14,13 @@
     desactive?: boolean;
     /** Préfixe des identifiants HTML (deux instances peuvent coexister). */
     id: string;
+    /** Famille affichée, ou `null` (accueil, paramètres) pour proposer tous les réglages. */
+    famille?: Famille | null;
   }
-  let { options, onchange, desactive = false, id }: Props = $props();
+  let { options, onchange, desactive = false, id, famille = null }: Props = $props();
+
+  const pourImages = $derived(famille === null || famille === "image");
+  const pourVideos = $derived(famille === null || famille === "video");
 
   const types = [
     { id: "taux" as const, libelle: "Par taux" },
@@ -86,8 +92,9 @@
     </div>
   {/if}
 
+  {#if pourImages}
   <div class="champ">
-    <label class="etiquette" for="{id}-dimensions">Dimensions maximales</label>
+    <label class="etiquette" for="{id}-dimensions">{famille ? "Dimensions maximales" : "Images : dimensions max."}</label>
     <span class="selecteur">
       <select
         id="{id}-dimensions"
@@ -105,6 +112,29 @@
       <span class="chevron"><ChevronDown size={14} strokeWidth={3} /></span>
     </span>
   </div>
+  {/if}
+
+  {#if pourVideos}
+    <div class="champ">
+      <label class="etiquette" for="{id}-definition">{famille ? "Définition maximale" : "Vidéos : définition max."}</label>
+      <span class="selecteur">
+        <select
+          id="{id}-definition"
+          value={String(options.hauteurMax)}
+          disabled={desactive}
+          onchange={(e) => {
+            const v = e.currentTarget.value;
+            onchange({ hauteurMax: v === "null" ? null : Number(v) });
+          }}
+        >
+          {#each HAUTEURS_MAX as h (h.libelle)}
+            <option value={String(h.valeur)}>{h.libelle}</option>
+          {/each}
+        </select>
+        <span class="chevron"><ChevronDown size={14} strokeWidth={3} /></span>
+      </span>
+    </div>
+  {/if}
 </div>
 
 <style>

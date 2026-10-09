@@ -55,6 +55,8 @@
     ["jxl-oxide (JPEG XL)", "MIT / Apache 2.0"],
     ["lopdf (PDF)", "MIT"],
     ["pdf.js (Mozilla)", "Apache 2.0"],
+    ["FFmpeg (build LGPL, programme séparé)", "LGPL 2.1+"],
+    ["OpenH264 (Cisco)", "BSD"],
     ["Police Nunito", "SIL Open Font License"],
     ["Icônes Lucide", "ISC"],
   ];

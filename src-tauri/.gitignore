@@ -3,3 +3,7 @@
 
 # Schémas générés automatiquement par Tauri
 /gen/schemas
+
+# FFmpeg et sa licence : téléchargés par scripts/telecharger-ffmpeg.mjs (trop lourds pour Git)
+/binaries/ffmpeg-*
+/binaries/FFMPEG-LICENSE.txt
