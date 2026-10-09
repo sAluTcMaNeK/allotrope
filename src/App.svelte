@@ -1,30 +1,54 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
+  import { documentDir, join } from "@tauri-apps/api/path";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import TitleBar from "./lib/TitleBar.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
   import DropZone from "./lib/DropZone.svelte";
   import FileQueue from "./lib/FileQueue.svelte";
-  import { analyserFichiers, type InfoFichier } from "./lib/fichiers";
+  import {
+    analyserFichiers,
+    convertirImage,
+    type ElementFile,
+    type FormatImage,
+  } from "./lib/fichiers";
 
-  let fichiers = $state<InfoFichier[]>([]);
+  /** Qualité JPEG par défaut (le panneau d'options la rendra réglable). */
+  const QUALITE_JPEG = 85;
+  /** Nombre maximal de conversions simultanées. */
+  const CONVERSIONS_PARALLELES = Math.max(1, Math.min(4, navigator.hardwareConcurrency || 2));
+
+  let elements = $state<ElementFile[]>([]);
   // Vrai pendant qu'un glisser-déposer survole la fenêtre
   let survol = $state(false);
+  let destination = $state("");
+  let enCours = $state(false);
 
   async function ajouter(chemins: string[]) {
     if (chemins.length === 0) return;
     const infos = await analyserFichiers(chemins);
     for (const info of infos) {
       // Un même fichier n'apparaît qu'une fois dans la file
-      if (!fichiers.some((f) => f.chemin === info.chemin)) {
-        fichiers.push(info);
+      if (!elements.some((e) => e.info.chemin === info.chemin)) {
+        elements.push({ info, format: info.formatsSortie[0] ?? null, etat: "attente" });
       }
     }
   }
 
   function retirer(chemin: string) {
-    fichiers = fichiers.filter((f) => f.chemin !== chemin);
+    elements = elements.filter((e) => e.info.chemin !== chemin);
+  }
+
+  function changerFormat(chemin: string, format: FormatImage) {
+    const element = elements.find((e) => e.info.chemin === chemin);
+    if (!element) return;
+    element.format = format;
+    // Changer le format d'un fichier déjà converti permet de le reconvertir
+    element.etat = "attente";
+    element.resultat = undefined;
+    element.erreur = undefined;
   }
 
   async function parcourir() {
@@ -32,7 +56,56 @@
     if (choix) await ajouter(choix);
   }
 
+  async function modifierDestination() {
+    const choix = await open({
+      directory: true,
+      defaultPath: destination,
+      title: "Choisir le dossier de destination",
+    });
+    if (choix) destination = choix;
+  }
+
+  async function convertir() {
+    const aFaire = elements.filter(
+      (e) => e.format && (e.etat === "attente" || e.etat === "erreur"),
+    );
+    enCours = true;
+
+    // Chaque « travailleur » prend le fichier suivant tant qu'il en reste
+    let suivant = 0;
+    const travailleur = async () => {
+      while (suivant < aFaire.length) {
+        const element = aFaire[suivant++];
+        // Le fichier a pu être retiré de la file entre-temps
+        if (!elements.some((e) => e.info.chemin === element.info.chemin)) continue;
+        element.etat = "encours";
+        element.erreur = undefined;
+        try {
+          element.resultat = await convertirImage(
+            element.info.chemin,
+            destination,
+            element.format!,
+            QUALITE_JPEG,
+          );
+          element.etat = "termine";
+        } catch (erreur) {
+          element.erreur = String(erreur);
+          element.etat = "erreur";
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(CONVERSIONS_PARALLELES, aFaire.length) }, travailleur),
+    );
+    enCours = false;
+  }
+
   onMount(() => {
+    // Destination par défaut : Documents\Allotrope (créé à la première conversion)
+    documentDir()
+      .then((documents) => join(documents, "Allotrope"))
+      .then((chemin) => (destination = chemin));
+
     // Tauri intercepte le glisser-déposer au niveau de la fenêtre et fournit les chemins complets
     const arret = getCurrentWebview().onDragDropEvent(({ payload }) => {
       if (payload.type === "enter" || payload.type === "over") {
@@ -57,11 +130,24 @@
     <Sidebar />
 
     <main class="contenu">
-      {#if fichiers.length === 0}
-        <h1>Que voulez-vous convertir ?</h1>
-        <DropZone {survol} onparcourir={parcourir} />
+      {#if elements.length === 0}
+        <div class="accueil">
+          <h1>Que voulez-vous convertir ?</h1>
+          <DropZone {survol} onparcourir={parcourir} />
+        </div>
       {:else}
-        <FileQueue {fichiers} {survol} onajouter={parcourir} onretirer={retirer} />
+        <FileQueue
+          {elements}
+          {survol}
+          {destination}
+          {enCours}
+          onajouter={parcourir}
+          onretirer={retirer}
+          onformat={changerFormat}
+          onouvrir={(chemin) => revealItemInDir(chemin)}
+          onmodifierdestination={modifierDestination}
+          onconvertir={convertir}
+        />
       {/if}
     </main>
   </div>
@@ -83,6 +169,11 @@
   .contenu {
     flex: 1;
     min-width: 0;
+    min-height: 0;
+  }
+
+  .accueil {
+    height: 100%;
     overflow-y: auto;
     padding: 32px 40px 40px;
     display: flex;

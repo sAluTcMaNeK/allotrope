@@ -1,7 +1,8 @@
-// Lien avec le module Rust `fichiers` (src-tauri/src/fichiers.rs) et outils d'affichage.
+// Lien avec les modules Rust `fichiers` et `conversion` (src-tauri/src/) et outils d'affichage.
 import { invoke } from "@tauri-apps/api/core";
 
 export type Famille = "image" | "video" | "audio" | "document";
+export type FormatImage = "jpeg" | "png" | "webp";
 
 /** Miroir de la structure Rust `InfoFichier`. */
 export interface InfoFichier {
@@ -10,12 +11,50 @@ export interface InfoFichier {
   extension: string;
   taille: number;
   famille: Famille | null;
+  /** [largeur, hauteur] en pixels, pour les images lisibles. */
+  dimensions: [number, number] | null;
+  /** Formats de conversion proposés, le format par défaut en premier. */
+  formatsSortie: FormatImage[];
+}
+
+/** Miroir de la structure Rust `ResultatConversion`. */
+export interface ResultatConversion {
+  chemin: string;
+  taille: number;
+}
+
+export type Etat = "attente" | "encours" | "termine" | "erreur";
+
+/** Un fichier de la file d'attente et l'avancement de sa conversion. */
+export interface ElementFile {
+  info: InfoFichier;
+  /** Format choisi ; `null` si le fichier ne peut pas être converti. */
+  format: FormatImage | null;
+  etat: Etat;
+  resultat?: ResultatConversion;
+  erreur?: string;
 }
 
 /** Demande au cœur Rust d'analyser des chemins (les dossiers sont ignorés). */
 export function analyserFichiers(chemins: string[]): Promise<InfoFichier[]> {
   return invoke<InfoFichier[]>("analyser_fichiers", { chemins });
 }
+
+/** Convertit une image ; rejette la promesse avec un message en français en cas d'échec. */
+export function convertirImage(
+  source: string,
+  dossier: string,
+  format: FormatImage,
+  qualite: number,
+): Promise<ResultatConversion> {
+  return invoke<ResultatConversion>("convertir_image", { source, dossier, format, qualite });
+}
+
+export const LIBELLES_FORMAT: Record<FormatImage, string> = {
+  jpeg: "JPG",
+  png: "PNG",
+  webp: "WEBP",
+};
 
 /** Présentation de chaque famille (voir DESIGN.md, « Couleur par famille de fichiers »). */
 export const FAMILLES: Record<Famille, { libelle: string; couleur: string; texte: string; formats: string }> = {

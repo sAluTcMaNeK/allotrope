@@ -1,5 +1,6 @@
 //! Analyse des fichiers reçus par l'interface (glisser-déposer ou sélecteur de fichiers).
 
+use crate::conversion::{formats_sortie, FormatImage};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -26,6 +27,10 @@ pub struct InfoFichier {
     pub taille: u64,
     /// `None` si le format n'est pas reconnu (devient `null` côté interface).
     pub famille: Option<Famille>,
+    /// Largeur et hauteur en pixels, pour les images lisibles.
+    pub dimensions: Option<(u32, u32)>,
+    /// Formats de conversion proposés, le format par défaut en premier (vide si non convertible).
+    pub formats_sortie: Vec<FormatImage>,
 }
 
 /// Déduit la famille d'un fichier à partir de son extension.
@@ -56,12 +61,22 @@ fn analyser(chemin: &Path) -> Option<InfoFichier> {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
 
+    let formats_sortie = formats_sortie(&extension);
+    // Ne lit que l'en-tête de l'image : rapide même pour une grosse photo
+    let dimensions = if formats_sortie.is_empty() {
+        None
+    } else {
+        image::image_dimensions(chemin).ok()
+    };
+
     Some(InfoFichier {
         chemin: chemin.to_path_buf(),
         nom,
         famille: famille_depuis_extension(&extension),
         extension,
         taille: meta.len(),
+        dimensions,
+        formats_sortie,
     })
 }
 

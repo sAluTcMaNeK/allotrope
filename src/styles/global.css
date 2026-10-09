@@ -12,6 +12,11 @@ body {
   margin: 0;
 }
 
+:root {
+  /* Les éléments natifs (listes déroulantes, barres de défilement) passent en thème sombre */
+  color-scheme: dark;
+}
+
 body {
   background: var(--abysse);
   color: var(--givre);
