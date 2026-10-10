@@ -1,5 +1,7 @@
+mod bureautique;
 mod compression;
 mod conversion;
+mod export_pages;
 mod fichiers;
 mod media;
 mod pdf;
@@ -28,7 +30,13 @@ pub fn run() {
             pdf::images_en_pdf,
             pdf_images::compresser_pdf,
             pdf_images::analyser_images_pdf,
-            pdf_images::extraire_images_pdf
+            pdf_images::extraire_images_pdf,
+            export_pages::export_pages_debut,
+            export_pages::export_pages_ajouter,
+            export_pages::export_pages_fin,
+            export_pages::export_pages_annuler,
+            bureautique::moteurs_bureautique,
+            bureautique::pdf_vers_texte
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");

@@ -7,6 +7,7 @@
 
 use crate::compression::qualite_pour;
 use crate::conversion::{creer_fichier_libre, encoder, enregistrer, nom_sans_extension, FormatImage};
+use crate::export_pages::creer_dossier_libre;
 use crate::pdf::charger;
 use base64::Engine;
 use image::imageops::FilterType;
@@ -632,19 +633,6 @@ pub fn extraire(source: &Path, ids: &[String], dossier: &Path, zip: bool) -> Res
         sous_dossier
     };
     Ok(ResultatExtraction { chemin, nombre, echecs })
-}
-
-/// Crée `dossier/nom`, ou `nom (2)`, `nom (3)`… si le nom est déjà pris.
-fn creer_dossier_libre(dossier: &Path, nom: &str) -> Result<PathBuf, String> {
-    for numero in 1.. {
-        let chemin = if numero == 1 { dossier.join(nom) } else { dossier.join(format!("{nom} ({numero})")) };
-        match std::fs::create_dir(&chemin) {
-            Ok(()) => return Ok(chemin),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(e) => return Err(format!("Impossible de créer le dossier : {e}")),
-        }
-    }
-    unreachable!()
 }
 
 #[cfg(test)]

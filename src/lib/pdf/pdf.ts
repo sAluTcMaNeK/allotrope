@@ -136,6 +136,98 @@ export async function dessinerPage(
   await page.render({ canvas, viewport: vue }).promise;
 }
 
+// --- PDF en images ---
+
+export type FormatPageImage = "png" | "jpeg" | "webp";
+
+/** Miroir de la structure Rust `ResultatExport`. */
+export interface ResultatExport {
+  /** Dossier créé, ou archive ZIP. */
+  chemin: string;
+  nombre: number;
+}
+
+/** Côté maximal d'une page rendue, en pixels (limite de taille des canevas du navigateur). */
+const COTE_MAX_RENDU = 10_000;
+
+/** Dessine une page à `ppp` points par pouce, sur fond blanc, et renvoie l'image PNG (sans perte). */
+async function rendrePagePng(pdf: PDFDocumentProxy, numero: number, ppp: number): Promise<Uint8Array> {
+  const page = await pdf.getPage(numero);
+  const naturelle = page.getViewport({ scale: 1 });
+  // 1 point PDF = 1/72 de pouce
+  const echelle = Math.min(ppp / 72, COTE_MAX_RENDU / Math.max(naturelle.width, naturelle.height));
+  const vue = page.getViewport({ scale: echelle });
+  const canvas = window.document.createElement("canvas");
+  canvas.width = Math.round(vue.width);
+  canvas.height = Math.round(vue.height);
+  try {
+    await page.render({ canvas, viewport: vue, background: "white" }).promise;
+    const image = await new Promise<Blob>((ok, echec) =>
+      canvas.toBlob((b) => (b ? ok(b) : echec(new Error("Rendu de la page impossible"))), "image/png"),
+    );
+    return new Uint8Array(await image.arrayBuffer());
+  } finally {
+    // Libère tout de suite la mémoire du canevas et de la page
+    canvas.width = 0;
+    canvas.height = 0;
+    page.cleanup();
+  }
+}
+
+/**
+ * Exporte des pages en images : chacune est dessinée par pdf.js puis envoyée au cœur Rust,
+ * qui l'encode (PNG, JPG, WEBP) et l'enregistre dans un dossier ou une archive ZIP.
+ * `onprogression` reçoit le nombre de pages faites ; `annule()` permet d'arrêter en cours de route.
+ */
+export async function exporterPages(
+  pdf: PDFDocumentProxy,
+  source: string,
+  pages: number[],
+  options: { dossier: string; zip: boolean; format: FormatPageImage; ppp: number; qualite: number },
+  onprogression: (faites: number) => void,
+  annule: () => boolean,
+): Promise<ResultatExport> {
+  const id = await invoke<number>("export_pages_debut", { source, dossier: options.dossier, zip: options.zip });
+  try {
+    for (const [index, numero] of pages.entries()) {
+      if (annule()) throw "Annulé";
+      const png = await rendrePagePng(pdf, numero, options.ppp);
+      // Image envoyée telle quelle (binaire brut) ; les réglages passent par les en-têtes
+      await invoke("export_pages_ajouter", png, {
+        headers: {
+          export: String(id),
+          page: String(numero),
+          format: options.format,
+          qualite: String(options.qualite),
+        },
+      });
+      onprogression(index + 1);
+    }
+    return await invoke<ResultatExport>("export_pages_fin", { export: id });
+  } catch (e) {
+    await invoke("export_pages_annuler", { export: id });
+    throw e;
+  }
+}
+
+// --- PDF en document Word / OpenDocument ---
+
+export type FormatTexte = "docx" | "odt";
+export type MoteurBureautique = "word" | "libreoffice";
+
+export function moteursBureautique(): Promise<{ word: boolean; libreoffice: boolean }> {
+  return invoke("moteurs_bureautique");
+}
+
+export function pdfVersTexte(
+  source: string,
+  dossier: string,
+  format: FormatTexte,
+  moteur: MoteurBureautique,
+): Promise<{ chemin: string; taille: number }> {
+  return invoke("pdf_vers_texte", { source, dossier, format, moteur });
+}
+
 /** Nom du fichier sans dossier ni extension (« rapport » pour « C:\…\rapport.pdf »). */
 export function nomSansExtension(chemin: string): string {
   const nom = chemin.split(/[\\/]/).pop() ?? chemin;
