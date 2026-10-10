@@ -96,7 +96,7 @@ pub fn compresser(
 }
 
 /// Qualité JPEG / WebP correspondant à un taux de compression (taux 0 → qualité 95, taux 100 → 5).
-fn qualite_pour(taux: u8) -> u8 {
+pub(crate) fn qualite_pour(taux: u8) -> u8 {
     (100 - taux.min(100)).clamp(5, 95)
 }
 

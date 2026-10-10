@@ -2,6 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from "pdfjs-dist";
 import urlTravailleur from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { octetsCible, type OptionsCompression } from "../fichiers";
 
 // pdf.js décode les PDF dans un « worker » (un fil séparé) pour ne pas figer l'interface
 GlobalWorkerOptions.workerSrc = urlTravailleur;
@@ -48,8 +49,6 @@ export function imagesEnPdf(
   return invoke("images_en_pdf", { images, dossier, nom, formatPage, marge });
 }
 
-export type NiveauPdf = "legere" | "recommandee" | "forte";
-
 /** Miroir de la structure Rust `ResultatCompressionPdf`. `chemin` est `null` si aucun gain n'était possible. */
 export interface ResultatCompressionPdf {
   chemin: string | null;
@@ -57,8 +56,53 @@ export interface ResultatCompressionPdf {
   images: number;
 }
 
-export function compresserPdf(source: string, dossier: string, niveau: NiveauPdf): Promise<ResultatCompressionPdf> {
-  return invoke("compresser_pdf", { source, dossier, niveau });
+/** Compresse un PDF avec les mêmes réglages que les autres fichiers (taux ou taille cible, dimensions max.). */
+export function compresserPdf(
+  source: string,
+  dossier: string,
+  options: OptionsCompression,
+): Promise<ResultatCompressionPdf> {
+  return invoke("compresser_pdf", {
+    source,
+    dossier,
+    taux: options.taux,
+    tailleCible: options.type === "taille" ? octetsCible(options) : null,
+    tailleMax: options.tailleMax,
+  });
+}
+
+/** Miroir de la structure Rust `ImageTrouvee`. */
+export interface ImageTrouvee {
+  /** Identifiant de l'image dans le PDF, à renvoyer pour l'extraction. */
+  id: string;
+  page: number | null;
+  largeur: number;
+  hauteur: number;
+  /** Format du fichier extrait : « jpg », « jp2 » ou « png ». */
+  format: string;
+  /** Miniature (data URL), ou `null` si l'image n'a pas pu être décodée. */
+  apercu: string | null;
+}
+
+/** Miroir de la structure Rust `ResultatExtraction`. */
+export interface ResultatExtraction {
+  /** Dossier créé, ou archive ZIP. */
+  chemin: string;
+  nombre: number;
+  echecs: number;
+}
+
+export function analyserImagesPdf(source: string): Promise<ImageTrouvee[]> {
+  return invoke("analyser_images_pdf", { source });
+}
+
+export function extraireImagesPdf(
+  source: string,
+  ids: string[],
+  dossier: string,
+  zip: boolean,
+): Promise<ResultatExtraction> {
+  return invoke("extraire_images_pdf", { source, ids, dossier, zip });
 }
 
 /** Ouvre un PDF avec pdf.js pour en afficher les pages (les octets sont lus par le cœur Rust). */

@@ -1,13 +1,22 @@
 <!-- Page « Outils PDF » : grille de cartouches carrées ; un clic ouvre l'outil correspondant. -->
 <script lang="ts">
   import type { Component } from "svelte";
-  import { ArrowDownUp, FileText, ImagePlus, Images, Layers, Shrink, Trash } from "@lucide/svelte";
+  import { ArrowDownUp, FileText, ImageDown, ImagePlus, Images, Layers, Shrink, Trash } from "@lucide/svelte";
   import FusionTool from "./FusionTool.svelte";
   import PagesTool from "./PagesTool.svelte";
   import ImagesTool from "./ImagesTool.svelte";
   import CompressionPdfTool from "./CompressionPdfTool.svelte";
+  import ExtractionImagesTool from "./ExtractionImagesTool.svelte";
 
-  type IdOutil = "fusionner" | "reorganiser" | "supprimer" | "images" | "compresser" | "en-images" | "word";
+  type IdOutil =
+    | "fusionner"
+    | "reorganiser"
+    | "supprimer"
+    | "images"
+    | "compresser"
+    | "extraire-images"
+    | "en-images"
+    | "word";
 
   interface Outil {
     id: IdOutil;
@@ -50,6 +59,12 @@
       icone: Shrink,
     },
     {
+      id: "extraire-images",
+      titre: "Extraire les images",
+      description: "Récupérez les photos d'un PDF, une à une ou toutes en ZIP.",
+      icone: ImageDown,
+    },
+    {
       id: "en-images",
       titre: "PDF en images",
       description: "Exportez chaque page en JPG ou PNG.",
@@ -79,6 +94,8 @@
   <ImagesTool onretour={retour} />
 {:else if ouvert === "compresser"}
   <CompressionPdfTool onretour={retour} />
+{:else if ouvert === "extraire-images"}
+  <ExtractionImagesTool onretour={retour} />
 {:else}
   <div class="accueil">
     <header>

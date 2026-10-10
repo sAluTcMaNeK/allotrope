@@ -1,4 +1,7 @@
-<!-- Outil « Compresser un PDF » : allège un ou plusieurs PDF en réencodant leurs images. -->
+<!--
+  Outil « Compresser un PDF » : allège un ou plusieurs PDF en réencodant leurs images.
+  Mêmes réglages que pour les autres fichiers : taux (curseur) ou taille cible, dimensions maximales.
+-->
 <script lang="ts">
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -7,11 +10,12 @@
   import ToolLayout from "./ToolLayout.svelte";
   import DepotPdf from "./DepotPdf.svelte";
   import QueueFooter from "../QueueFooter.svelte";
-  import Segmented from "../Segmented.svelte";
-  import { analyserFichiers, formaterTaille } from "../fichiers";
+  import CompressionFields from "../CompressionFields.svelte";
+  import { analyserFichiers, formaterTaille, type OptionsCompression } from "../fichiers";
+  import { reglages } from "../reglages.svelte";
   import { recevoirDepots } from "../depot.svelte";
   import { dossierPour } from "../destination.svelte";
-  import { compresserPdf, type NiveauPdf, type ResultatCompressionPdf } from "./pdf";
+  import { compresserPdf, type ResultatCompressionPdf } from "./pdf";
 
   interface Props {
     onretour: () => void;
@@ -27,14 +31,9 @@
     erreur?: string;
   }
 
-  const NIVEAUX: { id: NiveauPdf; libelle: string; detail: string }[] = [
-    { id: "legere", libelle: "Légère", detail: "Qualité préservée : images en qualité 80 %, jusqu'à 3000 px." },
-    { id: "recommandee", libelle: "Recommandée", detail: "Bon compromis pour l'écran et l'e-mail : qualité 65 %, jusqu'à 2000 px." },
-    { id: "forte", libelle: "Forte", detail: "Fichier le plus léger : qualité 45 %, jusqu'à 1400 px. Idéal pour un envoi rapide." },
-  ];
-
   let fichiers = $state<Fichier[]>([]);
-  let niveau = $state<NiveauPdf>("recommandee");
+  // Réglages de la session, initialisés avec la compression par défaut des Paramètres
+  let options = $state<OptionsCompression>({ ...reglages.compression });
   let enCours = $state(false);
   let message = $state<string | null>(null);
 
@@ -66,9 +65,9 @@
     if (choix) await ajouter(choix);
   }
 
-  function changerNiveau(nouveau: NiveauPdf) {
-    niveau = nouveau;
-    // Un nouveau niveau permet de recompresser les fichiers déjà traités
+  function changerOptions(modification: Partial<OptionsCompression>) {
+    Object.assign(options, modification);
+    // De nouveaux réglages permettent de recompresser les fichiers déjà traités
     for (const f of fichiers) {
       if (f.etat !== "encours") {
         f.etat = "attente";
@@ -81,12 +80,13 @@
   async function lancer() {
     enCours = true;
     // Un PDF à la fois : chaque compression utilise déjà plusieurs cœurs pour les images
+    const reglagesFiges = { ...options };
     for (const fichier of [...aTraiter]) {
       if (!fichiers.includes(fichier)) continue;
       fichier.etat = "encours";
       fichier.erreur = undefined;
       try {
-        fichier.resultat = await compresserPdf(fichier.chemin, await dossierPour(fichier.chemin), niveau);
+        fichier.resultat = await compresserPdf(fichier.chemin, await dossierPour(fichier.chemin), reglagesFiges);
         fichier.etat = "termine";
       } catch (e) {
         fichier.erreur = String(e);
@@ -99,7 +99,9 @@
   function meta(f: Fichier): string {
     const taille = formaterTaille(f.taille);
     if (f.etat !== "termine" || !f.resultat) return taille;
-    if (!f.resultat.chemin) return `${taille} · aucun gain possible`;
+    if (!f.resultat.chemin) {
+      return options.type === "taille" ? `${taille} · déjà sous la cible` : `${taille} · aucun gain possible`;
+    }
     const gain = Math.round((1 - f.resultat.taille / f.taille) * 100);
     return `${taille} → ${formaterTaille(f.resultat.taille)} · −${gain} %`;
   }
@@ -116,16 +118,14 @@
     <p class="message">{message}</p>
   {/if}
 
-  <section class="panneau" aria-label="Niveau de compression">
-    <div class="etiquette">Niveau de compression</div>
-    <Segmented
-      options={NIVEAUX.map(({ id, libelle }) => ({ id, libelle }))}
-      valeur={niveau}
-      onchange={changerNiveau}
-      etiquette="Niveau de compression"
-      desactive={enCours}
-    />
-    <p class="note">{NIVEAUX.find((n) => n.id === niveau)?.detail}</p>
+  <section class="panneau" aria-label="Réglages de compression">
+    <CompressionFields id="pdf" {options} onchange={changerOptions} desactive={enCours} famille="image" />
+    <p class="note">
+      {options.type === "taille"
+        ? "La taille cible vise le poids du PDF entier : Allotrope baisse la qualité des images, puis leurs dimensions si besoin."
+        : "Le taux règle la qualité des images (JPEG). Les dimensions maximales s'appliquent aux images du PDF."}
+      Le texte, les polices et les dessins restent intacts.
+    </p>
   </section>
 
   {#if fichiers.length === 0}
@@ -162,7 +162,7 @@
               <Folder size={18} strokeWidth={2.4} />
             </button>
           {:else if fichier.etat === "termine"}
-            <div class="pastille neutre">Déjà optimisé</div>
+            <div class="pastille neutre">{options.type === "taille" ? "Déjà sous la cible" : "Déjà optimisé"}</div>
           {:else if fichier.etat === "erreur"}
             <div class="etat echec">Échec</div>
           {:else}
@@ -199,8 +199,8 @@
   .panneau {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+    align-items: stretch;
+    gap: 14px;
     padding: 18px 20px;
     border-radius: 22px;
     border: 2px solid var(--ligne);
@@ -208,11 +208,6 @@
     /* Outil de compression : segment actif aux couleurs de la compression */
     --segment-actif: var(--mode-compresser);
     --segment-actif-texte: var(--mode-compresser-texte);
-  }
-
-  .etiquette {
-    font-size: 14px;
-    font-weight: 800;
   }
 
   .note,

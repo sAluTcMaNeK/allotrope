@@ -114,7 +114,7 @@ pub async fn images_en_pdf(
 
 /// Ouvre un PDF. Les PDF protégés seulement contre la modification (sans mot de passe d'ouverture)
 /// sont déchiffrés automatiquement par lopdf.
-fn charger(chemin: &Path) -> Result<Document, String> {
+pub(crate) fn charger(chemin: &Path) -> Result<Document, String> {
     let nom = chemin.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let document = Document::load(chemin)
         .map_err(|e| format!("Impossible de lire « {nom} » (fichier abîmé ou protégé ?) : {e}"))?;
@@ -238,7 +238,7 @@ pub fn assembler(sources: &[PathBuf], pages: &[PageChoisie]) -> Result<Document,
 }
 
 /// Compresse et enregistre le document dans `dossier/nom.pdf` sans écraser de fichier existant.
-fn sauvegarder(document: &mut Document, dossier: &Path, nom: &str) -> Result<ResultatPdf, String> {
+pub(crate) fn sauvegarder(document: &mut Document, dossier: &Path, nom: &str) -> Result<ResultatPdf, String> {
     document.compress();
     let mut octets = Vec::new();
     document.save_to(&mut octets).map_err(|e| format!("Échec de l'écriture du PDF : {e}"))?;
@@ -413,209 +413,6 @@ pub fn creer_depuis_images(images: &[PathBuf], format_page: FormatPage, marge: f
     Ok(document)
 }
 
-// --- Compression de PDF ---
-
-/// Niveau de compression d'un PDF.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum NiveauPdf {
-    Legere,
-    Recommandee,
-    Forte,
-}
-
-impl NiveauPdf {
-    /// Qualité JPEG des images réencodées.
-    fn qualite(self) -> u8 {
-        match self {
-            NiveauPdf::Legere => 80,
-            NiveauPdf::Recommandee => 65,
-            NiveauPdf::Forte => 45,
-        }
-    }
-
-    /// Plus grand côté autorisé pour une image, en pixels (au-delà, elle est réduite).
-    fn cote_max(self) -> u32 {
-        match self {
-            NiveauPdf::Legere => 3000,
-            NiveauPdf::Recommandee => 2000,
-            NiveauPdf::Forte => 1400,
-        }
-    }
-}
-
-/// Résultat renvoyé à l'interface.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResultatCompressionPdf {
-    /// `None` si le PDF n'a pas pu être allégé : aucun fichier n'est alors créé.
-    pub chemin: Option<PathBuf>,
-    pub taille: u64,
-    /// Nombre d'images réencodées.
-    pub images: u32,
-}
-
-/// Compresse `source` dans `dossier/nom (compressé).pdf`.
-#[tauri::command]
-pub async fn compresser_pdf(
-    source: PathBuf,
-    dossier: PathBuf,
-    niveau: NiveauPdf,
-) -> Result<ResultatCompressionPdf, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let taille_originale = std::fs::metadata(&source).map(|m| m.len()).unwrap_or(u64::MAX);
-        let (octets, images) = compresser_document(&source, niveau)?;
-        if octets.len() as u64 >= taille_originale {
-            return Ok(ResultatCompressionPdf { chemin: None, taille: taille_originale, images: 0 });
-        }
-        let nom = format!("{} (compressé)", crate::conversion::nom_sans_extension(&source));
-        let chemin = enregistrer(&dossier, &nom, "pdf", &octets)?;
-        Ok(ResultatCompressionPdf { chemin: Some(chemin), taille: octets.len() as u64, images })
-    })
-    .await
-    .map_err(|e| format!("Compression interrompue : {e}"))?
-}
-
-/// Réencode les images du PDF puis l'enregistre de façon compacte. Renvoie les octets et le
-/// nombre d'images allégées. Le texte, les polices et les dessins vectoriels ne sont pas touchés.
-pub fn compresser_document(source: &Path, niveau: NiveauPdf) -> Result<(Vec<u8>, u32), String> {
-    let mut document = charger(source)?;
-
-    // Les masques de transparence (SMask) restent intacts : les passer en JPEG créerait des halos
-    let masques: Vec<ObjectId> = document
-        .objects
-        .values()
-        .filter_map(|o| o.as_stream().ok())
-        .filter_map(|s| s.dict.get(b"SMask").and_then(Object::as_reference).ok())
-        .collect();
-    let images: Vec<ObjectId> = document
-        .objects
-        .iter()
-        .filter(|(id, o)| {
-            !masques.contains(id)
-                && o.as_stream()
-                    .map(|s| s.dict.get(b"Subtype").and_then(Object::as_name).ok() == Some(b"Image".as_slice()))
-                    .unwrap_or(false)
-        })
-        .map(|(id, _)| *id)
-        .collect();
-
-    let mut allegees = 0;
-    for id in images {
-        let espace = espace_couleur(&document, id);
-        if let Ok(Object::Stream(flux)) = document.get_object_mut(id) {
-            if let Some(composantes) = espace {
-                if recompresser_image(flux, composantes, niveau) {
-                    allegees += 1;
-                }
-            }
-        }
-    }
-
-    // Supprime les objets inutilisés, compresse les flux restants sans perte,
-    // puis regroupe les petits objets dans des « flux d'objets » (PDF 1.5+)
-    document.prune_objects();
-    document.compress();
-    if document.version.as_str() < "1.5" {
-        document.version = "1.5".into();
-    }
-    let mut octets = Vec::new();
-    let options = lopdf::SaveOptions::builder().use_object_streams(true).use_xref_streams(true).build();
-    document
-        .save_with_options(&mut octets, options)
-        .map_err(|e| format!("Échec de l'écriture du PDF : {e}"))?;
-    Ok((octets, allegees))
-}
-
-/// Nombre de composantes de couleur de l'image `id` (1 = gris, 3 = RVB), si elle peut être
-/// réencodée en JPEG sans changer son espace de couleur. `None` pour le CMJN, les palettes, etc.
-fn espace_couleur(document: &Document, id: ObjectId) -> Option<u8> {
-    let flux = document.get_object(id).ok()?.as_stream().ok()?;
-    let espace = flux.dict.get(b"ColorSpace").ok()?;
-    let espace = match espace {
-        Object::Reference(r) => document.get_object(*r).ok()?,
-        autre => autre,
-    };
-    match espace {
-        Object::Name(nom) if nom == b"DeviceRGB" => Some(3),
-        Object::Name(nom) if nom == b"DeviceGray" => Some(1),
-        // Profil ICC : on garde le profil, seul compte le nombre de composantes
-        Object::Array(tableau) if tableau.first().and_then(|o| o.as_name().ok()) == Some(b"ICCBased") => {
-            let profil = tableau.get(1)?.as_reference().ok()?;
-            let n = document.get_object(profil).ok()?.as_stream().ok()?.dict.get(b"N").ok()?.as_i64().ok()?;
-            matches!(n, 1 | 3).then_some(n as u8)
-        }
-        _ => None,
-    }
-}
-
-/// Réencode une image du PDF en JPEG (réduite si elle est démesurée).
-/// Ne remplace l'image que si le résultat est nettement plus léger. Renvoie vrai si elle a été remplacée.
-fn recompresser_image(flux: &mut Stream, composantes: u8, niveau: NiveauPdf) -> bool {
-    let entier = |cle: &[u8]| flux.dict.get(cle).and_then(Object::as_i64).ok();
-    let (Some(largeur), Some(hauteur)) = (entier(b"Width"), entier(b"Height")) else {
-        return false;
-    };
-    // Images 8 bits seulement, sans masque binaire ni table de décodage particulière
-    let bits = entier(b"BitsPerComponent").unwrap_or(8);
-    if bits != 8
-        || flux.dict.has(b"Decode")
-        || flux.dict.get(b"ImageMask").and_then(Object::as_bool).unwrap_or(false)
-        || largeur * hauteur < 96 * 96
-    {
-        return false;
-    }
-    let (largeur, hauteur) = (largeur as u32, hauteur as u32);
-    let filtres: Vec<Vec<u8>> = flux.filters().map(|f| f.iter().map(|n| n.to_vec()).collect()).unwrap_or_default();
-
-    // Pixels de l'image : JPEG d'origine décodé, ou pixels bruts (compressés sans perte ou non)
-    let image = match filtres.iter().map(Vec::as_slice).collect::<Vec<_>>().as_slice() {
-        [b"DCTDecode"] => image::load_from_memory_with_format(&flux.content, image::ImageFormat::Jpeg).ok(),
-        [] | [b"FlateDecode"] => {
-            let attendu = (largeur * hauteur * composantes as u32) as usize;
-            // Limite de décompression : protège contre un fichier piégé (« bombe de décompression »)
-            let pixels = flux.get_plain_content_with_limit(attendu + 1024).ok().filter(|p| p.len() == attendu);
-            pixels.and_then(|p| match composantes {
-                1 => image::GrayImage::from_raw(largeur, hauteur, p).map(image::DynamicImage::ImageLuma8),
-                _ => image::RgbImage::from_raw(largeur, hauteur, p).map(image::DynamicImage::ImageRgb8),
-            })
-        }
-        _ => None,
-    };
-    let Some(mut image) = image else {
-        return false;
-    };
-
-    let cote_max = niveau.cote_max();
-    let reduite = largeur > cote_max || hauteur > cote_max;
-    if reduite {
-        image = image.resize(cote_max, cote_max, image::imageops::FilterType::Lanczos3);
-    }
-
-    // JPEG en niveaux de gris ou en RVB, selon l'espace de couleur d'origine
-    let mut jpeg = Vec::new();
-    let encodeur = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, niveau.qualite());
-    let encode = match composantes {
-        1 => image::DynamicImage::ImageLuma8(image.to_luma8()).write_with_encoder(encodeur),
-        _ => image::DynamicImage::ImageRgb8(image.to_rgb8()).write_with_encoder(encodeur),
-    };
-    if encode.is_err() {
-        return false;
-    }
-
-    // On ne remplace que si le gain est réel (au moins 10 %)
-    if !reduite && jpeg.len() * 10 >= flux.content.len() * 9 {
-        return false;
-    }
-    flux.dict.set("Filter", "DCTDecode");
-    flux.dict.remove(b"DecodeParms");
-    flux.dict.set("Width", image.width() as i64);
-    flux.dict.set("Height", image.height() as i64);
-    flux.dict.set("BitsPerComponent", 8);
-    flux.set_content(jpeg);
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -732,34 +529,6 @@ mod tests {
         let premiere = *relu.get_pages().get(&1).unwrap();
         let boite = relu.get_dictionary(premiere).unwrap().get(b"MediaBox").unwrap().as_array().unwrap().clone();
         assert!((boite[2].as_float().unwrap() - A4.1).abs() < 0.1);
-        std::fs::remove_dir_all(&dossier).unwrap();
-    }
-
-    #[test]
-    fn compresse_les_images_d_un_pdf() {
-        let dossier = dossier_test("pdf-compression");
-        // Grande image détaillée en PNG : intégrée sans perte (FlateDecode), donc lourde
-        let png = dossier.join("scan.png");
-        RgbImage::from_fn(2600, 1800, |x, y| Rgb([(x * 7 + y) as u8, (x ^ y) as u8, (x * y / 7) as u8]))
-            .save(&png)
-            .unwrap();
-        let mut document = creer_depuis_images(&[png], FormatPage::A4, 0.0).unwrap();
-        let source = sauvegarder(&mut document, &dossier, "lourd").unwrap();
-
-        let (octets, images) = compresser_document(&source.chemin, NiveauPdf::Forte).unwrap();
-        assert_eq!(images, 1);
-        assert!(octets.len() * 2 < source.taille as usize, "{} devrait être bien < {}", octets.len(), source.taille);
-
-        // Le PDF produit reste lisible, avec la même page et une image réduite à 1400 px
-        let relu = Document::load_mem(&octets).unwrap();
-        assert_eq!(relu.get_pages().len(), 1);
-        let image = relu
-            .objects
-            .values()
-            .filter_map(|o| o.as_stream().ok())
-            .find(|s| s.dict.get(b"Subtype").and_then(Object::as_name).ok() == Some(b"Image".as_slice()))
-            .unwrap();
-        assert_eq!(image.dict.get(b"Width").unwrap().as_i64().unwrap(), 1400);
         std::fs::remove_dir_all(&dossier).unwrap();
     }
 

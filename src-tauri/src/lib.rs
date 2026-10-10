@@ -3,6 +3,7 @@ mod conversion;
 mod fichiers;
 mod media;
 mod pdf;
+mod pdf_images;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,7 +26,9 @@ pub fn run() {
             pdf::lire_pdf,
             pdf::assembler_pdf,
             pdf::images_en_pdf,
-            pdf::compresser_pdf
+            pdf_images::compresser_pdf,
+            pdf_images::analyser_images_pdf,
+            pdf_images::extraire_images_pdf
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");

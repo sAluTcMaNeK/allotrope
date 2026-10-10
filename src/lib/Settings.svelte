@@ -119,8 +119,8 @@
       onchange={(modification) => Object.assign(reglages.compression, modification)}
     />
     <p class="note">
-      Réglages proposés à chaque ouverture d'Allotrope ; vous pouvez les ajuster au-dessus de la file
-      d'attente. Les PNG restent toujours sans perte.
+      Réglages proposés à chaque ouverture d'Allotrope, pour les images, l'audio, la vidéo et les PDF ;
+      vous pouvez les ajuster au moment de compresser. Les PNG restent toujours sans perte.
     </p>
   </section>
 
