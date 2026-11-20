@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { open } from "@tauri-apps/plugin-dialog";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import TitleBar from "./lib/TitleBar.svelte";
@@ -293,9 +295,21 @@
     enCours = false;
   }
 
+  /** Fichiers reçus de l'explorateur (clic droit « Convertir avec Allotrope », ligne de commande). */
+  function recevoirFichiers(chemins: string[]) {
+    if (chemins.length === 0) return;
+    // Ils rejoignent la file d'attente de l'accueil, qui accepte tous les types de fichiers
+    if (page !== "accueil") naviguer("accueil");
+    ajouter(chemins);
+  }
+
   onMount(() => {
     // Destination par défaut : Documents\Allotrope (créé au premier fichier produit)
     initialiserDestination();
+
+    // Fichiers passés au lancement, puis ceux des lancements suivants (fenêtre déjà ouverte)
+    invoke<string[]>("fichiers_au_demarrage").then(recevoirFichiers);
+    const arretOuverture = listen<string[]>("fichiers-ouverts", ({ payload }) => recevoirFichiers(payload));
 
     // Tauri intercepte le glisser-déposer au niveau de la fenêtre et fournit les chemins complets.
     // Sur la page Outils PDF, les fichiers vont à l'outil ouvert (s'il en attend).
@@ -313,6 +327,7 @@
     });
     return () => {
       arret.then((desabonner) => desabonner());
+      arretOuverture.then((desabonner) => desabonner());
     };
   });
 </script>

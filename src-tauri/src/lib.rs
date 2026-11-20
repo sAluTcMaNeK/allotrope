@@ -4,18 +4,35 @@ mod conversion;
 mod export_pages;
 mod fichiers;
 mod media;
+mod ouverture;
 mod pdf;
 mod pdf_images;
+
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Une seule fenêtre Allotrope : un nouveau lancement (clic droit « Convertir avec Allotrope »
+        // sur plusieurs fichiers) transmet ses fichiers à la fenêtre déjà ouverte.
+        // Ce plugin doit être enregistré en premier.
+        .plugin(tauri_plugin_single_instance::init(|app, arguments, dossier_courant| {
+            ouverture::nouvelle_instance(app, arguments, dossier_courant);
+        }))
         // Sélecteur de fichiers et de dossiers natif
         .plugin(tauri_plugin_dialog::init())
         // Afficher un fichier converti dans l'explorateur
         .plugin(tauri_plugin_opener::init())
         // Lancer FFmpeg (sidecar) pour l'audio et la vidéo
         .plugin(tauri_plugin_shell::init())
+        .setup(|app| {
+            // Fichiers passés au premier lancement : l'interface les demandera une fois prête
+            let arguments: Vec<String> = std::env::args().collect();
+            let dossier_courant = std::env::current_dir().unwrap_or_default();
+            let chemins = ouverture::chemins_depuis_arguments(&arguments, &dossier_courant);
+            app.manage(ouverture::FichiersAuDemarrage(std::sync::Mutex::new(chemins)));
+            Ok(())
+        })
         // Commandes Rust accessibles depuis l'interface avec `invoke`
         .invoke_handler(tauri::generate_handler![
             fichiers::analyser_fichiers,
@@ -38,7 +55,8 @@ pub fn run() {
             export_pages::export_pages_annuler,
             bureautique::moteurs_bureautique,
             bureautique::pdf_vers_texte,
-            bureautique::document_vers_pdf
+            bureautique::document_vers_pdf,
+            ouverture::fichiers_au_demarrage
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");
