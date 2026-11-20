@@ -233,3 +233,15 @@ export function nomSansExtension(chemin: string): string {
   const nom = chemin.split(/[\\/]/).pop() ?? chemin;
   return nom.replace(/\.[^.]+$/, "");
 }
+
+/** Documents que l'on sait transformer en PDF (miroir de EXTENSIONS_DOCUMENT, bureautique.rs). */
+export const EXTENSIONS_DOCUMENT: readonly string[] = ["doc", "docx", "docm", "dot", "dotx", "odt", "ott", "rtf", "txt"];
+
+/** Transforme un document (Word, ODT, RTF, texte) en PDF avec Word ou LibreOffice. */
+export function documentVersPdf(
+  source: string,
+  dossier: string,
+  moteur: MoteurBureautique,
+): Promise<{ chemin: string; taille: number }> {
+  return invoke("document_vers_pdf", { source, dossier, moteur });
+}

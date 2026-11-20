@@ -1,7 +1,9 @@
-//! Conversion PDF → DOCX / ODT avec un traitement de texte installé sur l'ordinateur.
+//! Conversions PDF → DOCX / ODT et document (Word, ODT, RTF…) → PDF avec un traitement de texte
+//! installé sur l'ordinateur.
 //!
-//! Reconstituer un document modifiable (paragraphes, tableaux, images) à partir d'un PDF demande
-//! un vrai moteur de traitement de texte. Deux moteurs possibles, tous deux locaux :
+//! Reconstituer un document modifiable (paragraphes, tableaux, images) à partir d'un PDF, ou mettre
+//! en page fidèlement un document Word, demande un vrai moteur de traitement de texte. Deux moteurs
+//! possibles, tous deux locaux :
 //! - **Microsoft Word** (Windows), piloté par automatisation COM via PowerShell : meilleur résultat ;
 //! - **LibreOffice** (Windows, macOS, Linux), en mode « headless » (sans fenêtre).
 //!
@@ -32,6 +34,44 @@ impl FormatTexte {
         }
     }
 }
+
+/// Ce que l'on demande au moteur de produire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Production {
+    /// Document modifiable reconstitué à partir d'un PDF.
+    Texte(FormatTexte),
+    /// PDF mis en page à partir d'un document.
+    Pdf,
+}
+
+impl Production {
+    fn extension(self) -> &'static str {
+        match self {
+            Production::Texte(format) => format.extension(),
+            Production::Pdf => "pdf",
+        }
+    }
+
+    /// Code de format d'enregistrement de Word : 16 = .docx, 23 = .odt, 17 = .pdf.
+    fn code_word(self) -> &'static str {
+        match self {
+            Production::Texte(FormatTexte::Docx) => "16",
+            Production::Texte(FormatTexte::Odt) => "23",
+            Production::Pdf => "17",
+        }
+    }
+
+    /// Nom de ce que l'on convertit, pour les messages d'erreur.
+    fn objet(self) -> &'static str {
+        match self {
+            Production::Texte(_) => "ce PDF",
+            Production::Pdf => "ce document",
+        }
+    }
+}
+
+/// Documents que l'on sait transformer en PDF (avec Word comme avec LibreOffice).
+pub const EXTENSIONS_DOCUMENT: &[&str] = &["doc", "docx", "docm", "dot", "dotx", "odt", "ott", "rtf", "txt"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -68,17 +108,37 @@ pub async fn pdf_vers_texte(
     format: FormatTexte,
     moteur: Moteur,
 ) -> Result<ResultatBureautique, String> {
+    convertir_en_tache(source, dossier, Production::Texte(format), moteur).await
+}
+
+/// Transforme le document `source` (Word, ODT, RTF, texte) en `dossier/nom.pdf` avec le moteur choisi.
+#[tauri::command]
+pub async fn document_vers_pdf(source: PathBuf, dossier: PathBuf, moteur: Moteur) -> Result<ResultatBureautique, String> {
+    let extension = crate::conversion::extension_de(&source);
+    if !EXTENSIONS_DOCUMENT.contains(&extension.as_str()) {
+        return Err("Ce type de document n'est pas pris en charge".into());
+    }
+    convertir_en_tache(source, dossier, Production::Pdf, moteur).await
+}
+
+/// Lance la conversion dans un fil dédié (le moteur peut prendre plusieurs secondes).
+async fn convertir_en_tache(
+    source: PathBuf,
+    dossier: PathBuf,
+    production: Production,
+    moteur: Moteur,
+) -> Result<ResultatBureautique, String> {
     tauri::async_runtime::spawn_blocking(move || {
         std::fs::create_dir_all(&dossier).map_err(|e| format!("Impossible de créer le dossier de destination : {e}"))?;
         // Nom réservé tout de suite (jamais d'écrasement), puis rempli par le moteur
-        let (sortie, fichier) = creer_fichier_libre(&dossier, &nom_sans_extension(&source), format.extension())
+        let (sortie, fichier) = creer_fichier_libre(&dossier, &nom_sans_extension(&source), production.extension())
             .map_err(|e| format!("Impossible de créer le fichier de sortie : {e}"))?;
         drop(fichier);
 
         let resultat = match moteur {
-            Moteur::Word => systeme::convertir_avec_word(&source, &sortie, format),
+            Moteur::Word => systeme::convertir_avec_word(&source, &sortie, production),
             Moteur::Libreoffice => match chemin_libreoffice() {
-                Some(soffice) => convertir_avec_libreoffice(&soffice, &source, &sortie, format),
+                Some(soffice) => convertir_avec_libreoffice(&soffice, &source, &sortie, production),
                 None => Err("LibreOffice n'est pas installé".into()),
             },
         };
@@ -178,29 +238,35 @@ pub fn url_fichier(chemin: &Path) -> String {
     if texte.starts_with('/') { format!("file://{texte}") } else { format!("file:///{texte}") }
 }
 
-/// Arguments de LibreOffice pour convertir un PDF en document Writer modifiable.
-pub fn arguments_libreoffice(source: &Path, dossier_sortie: &Path, profil: &Path, format: FormatTexte) -> Vec<String> {
-    let filtre = match format {
-        FormatTexte::Docx => "docx:MS Word 2007 XML",
-        FormatTexte::Odt => "odt:writer8",
+/// Arguments de LibreOffice : PDF → document Writer modifiable, ou document → PDF.
+pub fn arguments_libreoffice(source: &Path, dossier_sortie: &Path, profil: &Path, production: Production) -> Vec<String> {
+    let filtre = match production {
+        Production::Texte(FormatTexte::Docx) => "docx:MS Word 2007 XML",
+        Production::Texte(FormatTexte::Odt) => "odt:writer8",
+        Production::Pdf => "pdf:writer_pdf_Export",
     };
-    vec![
+    let mut arguments: Vec<String> = vec![
         "--headless".into(),
         "--norestore".into(),
         "--nolockcheck".into(),
         // Profil séparé : la conversion fonctionne même si LibreOffice est déjà ouvert
         format!("-env:UserInstallation={}", url_fichier(profil)),
+    ];
+    if matches!(production, Production::Texte(_)) {
         // Importe le PDF dans Writer (traitement de texte) plutôt que dans Draw (dessin)
-        "--infilter=writer_pdf_import".into(),
+        arguments.push("--infilter=writer_pdf_import".into());
+    }
+    arguments.extend([
         "--convert-to".into(),
         filtre.into(),
         "--outdir".into(),
         dossier_sortie.to_string_lossy().into_owned(),
         source.to_string_lossy().into_owned(),
-    ]
+    ]);
+    arguments
 }
 
-fn convertir_avec_libreoffice(soffice: &Path, source: &Path, sortie: &Path, format: FormatTexte) -> Result<(), String> {
+fn convertir_avec_libreoffice(soffice: &Path, source: &Path, sortie: &Path, production: Production) -> Result<(), String> {
     // Dossier de travail temporaire : profil LibreOffice et fichier produit
     let travail = std::env::temp_dir().join(format!(
         "allotrope-libreoffice-{}-{}",
@@ -211,12 +277,13 @@ fn convertir_avec_libreoffice(soffice: &Path, source: &Path, sortie: &Path, form
     std::fs::create_dir_all(&dossier_sortie).map_err(|e| format!("Dossier temporaire impossible : {e}"))?;
 
     let mut commande = Command::new(soffice);
-    commande.args(arguments_libreoffice(source, &dossier_sortie, &travail.join("profil"), format));
+    commande.args(arguments_libreoffice(source, &dossier_sortie, &travail.join("profil"), production));
     let resultat = executer(commande, DELAI, || {}).and_then(|sortie_lo| {
-        let produit = dossier_sortie.join(format!("{}.{}", nom_sans_extension(source), format.extension()));
+        let produit = dossier_sortie.join(format!("{}.{}", nom_sans_extension(source), production.extension()));
         if !produit.is_file() {
             return Err(format!(
-                "LibreOffice n'a pas pu convertir ce PDF{}",
+                "LibreOffice n'a pas pu convertir {}{}",
+                production.objet(),
                 if sortie_lo.erreurs.trim().is_empty() { String::new() } else { format!(" : {}", sortie_lo.erreurs.trim()) }
             ));
         }
@@ -231,7 +298,7 @@ fn convertir_avec_libreoffice(soffice: &Path, source: &Path, sortie: &Path, form
 
 #[cfg(windows)]
 mod systeme {
-    use super::{executer, FormatTexte, Sortie, DELAI};
+    use super::{executer, Production, Sortie, DELAI};
     use std::os::windows::process::CommandExt;
     use std::path::Path;
     use std::process::Command;
@@ -262,7 +329,8 @@ mod systeme {
             .collect()
     }
 
-    /// Script PowerShell : ouvre le PDF dans Word (conversion « PDF Reflow ») et l'enregistre.
+    /// Script PowerShell : ouvre le fichier dans Word (pour un PDF : conversion « PDF Reflow ») et
+    /// l'enregistre dans le format demandé.
     /// Les chemins passent par des variables d'environnement : aucun risque avec les caractères spéciaux.
     const SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
@@ -283,12 +351,8 @@ try {
 }
 "#;
 
-    pub fn convertir_avec_word(source: &Path, sortie: &Path, format: FormatTexte) -> Result<(), String> {
-        // Formats d'enregistrement de Word : 16 = .docx, 23 = .odt (OpenDocument)
-        let code = match format {
-            FormatTexte::Docx => "16",
-            FormatTexte::Odt => "23",
-        };
+    pub fn convertir_avec_word(source: &Path, sortie: &Path, production: Production) -> Result<(), String> {
+        let code = production.code_word();
         let avant = processus_word();
         let mut commande = Command::new("powershell");
         commande
@@ -308,7 +372,7 @@ try {
         if succes {
             Ok(())
         } else {
-            Err(format!("Word n'a pas pu convertir ce PDF : {}", erreurs.trim()))
+            Err(format!("Word n'a pas pu convertir {} : {}", production.objet(), erreurs.trim()))
         }
     }
 }
@@ -316,7 +380,7 @@ try {
 /// Hors Windows : pas de Word, et rien à masquer.
 #[cfg(not(windows))]
 mod systeme {
-    use super::FormatTexte;
+    use super::Production;
     use std::path::Path;
     use std::process::Command;
 
@@ -326,7 +390,7 @@ mod systeme {
         false
     }
 
-    pub fn convertir_avec_word(_source: &Path, _sortie: &Path, _format: FormatTexte) -> Result<(), String> {
+    pub fn convertir_avec_word(_source: &Path, _sortie: &Path, _production: Production) -> Result<(), String> {
         Err("Microsoft Word n'est utilisable que sous Windows".into())
     }
 }
@@ -341,12 +405,36 @@ mod tests {
             Path::new("C:/docs/rapport.pdf"),
             Path::new("C:/tmp/sortie"),
             Path::new(r"C:\tmp\profil"),
-            FormatTexte::Odt,
+            Production::Texte(FormatTexte::Odt),
         );
         assert!(args.contains(&"--infilter=writer_pdf_import".to_string()));
         assert!(args.contains(&"odt:writer8".to_string()));
         assert!(args.contains(&"-env:UserInstallation=file:///C:/tmp/profil".to_string()));
         assert_eq!(args.last().unwrap(), "C:/docs/rapport.pdf");
+    }
+
+    #[test]
+    fn arguments_pour_produire_un_pdf() {
+        let args = arguments_libreoffice(
+            Path::new("C:/docs/lettre.docx"),
+            Path::new("C:/tmp/sortie"),
+            Path::new("C:/tmp/profil"),
+            Production::Pdf,
+        );
+        // Pas d'import PDF : le document s'ouvre normalement dans Writer
+        assert!(!args.iter().any(|a| a.starts_with("--infilter")));
+        assert!(args.contains(&"pdf:writer_pdf_Export".to_string()));
+        assert_eq!(Production::Pdf.code_word(), "17");
+    }
+
+    #[test]
+    fn refuse_un_document_inconnu() {
+        let resultat = tauri::async_runtime::block_on(document_vers_pdf(
+            PathBuf::from("photo.png"),
+            std::env::temp_dir(),
+            Moteur::Libreoffice,
+        ));
+        assert!(resultat.is_err());
     }
 
     #[test]

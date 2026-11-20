@@ -9,6 +9,7 @@
   import ExtractionImagesTool from "./ExtractionImagesTool.svelte";
   import PdfEnImagesTool from "./PdfEnImagesTool.svelte";
   import PdfVersTexteTool from "./PdfVersTexteTool.svelte";
+  import DocumentVersPdfTool from "./DocumentVersPdfTool.svelte";
 
   import type { OptionsCompression } from "../fichiers";
 
@@ -92,7 +93,6 @@
       titre: "Word en PDF",
       description: "Transformez un document Word ou ODT en PDF.",
       icone: FileText,
-      bientot: "Module documents",
     },
   ];
 
@@ -130,6 +130,8 @@
   <PdfEnImagesTool onretour={retour} />
 {:else if ouvert === "pdf-texte"}
   <PdfVersTexteTool onretour={retour} />
+{:else if ouvert === "word"}
+  <DocumentVersPdfTool onretour={retour} />
 {:else}
   <div class="accueil">
     <header>

@@ -12,6 +12,7 @@
     type Mode,
     type TypeCompression,
   } from "./fichiers";
+  import { EXTENSIONS_DOCUMENT } from "./pdf/pdf";
 
   interface Props {
     element: ElementFile;
@@ -68,6 +69,7 @@
   // Message affiché quand le fichier ne peut pas être traité par l'outil actif
   const indisponible = $derived.by(() => {
     if (info.extension === "pdf") return "Voir les Outils PDF";
+    if (EXTENSIONS_DOCUMENT.includes(info.extension)) return "Voir Outils PDF › Word en PDF";
     if (!famille) return "Format non pris en charge";
     // Fichier convertible, mais le format demandé pour le lot est déjà le sien
     if (mode === "convertir" && info.formatsSortie.length > 0) return "Déjà dans ce format";

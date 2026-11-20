@@ -36,7 +36,8 @@ pub fn run() {
             export_pages::export_pages_fin,
             export_pages::export_pages_annuler,
             bureautique::moteurs_bureautique,
-            bureautique::pdf_vers_texte
+            bureautique::pdf_vers_texte,
+            bureautique::document_vers_pdf
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");
