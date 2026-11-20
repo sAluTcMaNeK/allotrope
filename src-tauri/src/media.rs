@@ -269,12 +269,17 @@ fn debit_video(info: &InfoMedia, hauteur_max: Option<u32>, bits_par_pixel: f64) 
     ((l * h * ips * bits_par_pixel) as u64).clamp(150_000, 40_000_000)
 }
 
-/// Codec vidéo H.264 (OpenH264) à un débit donné.
+/// Codec vidéo H.264 à un débit donné : OpenH264 (Windows, Linux), ou l'encodeur matériel
+/// d'Apple (VideoToolbox) sur macOS, fourni avec le système et sous sa licence.
 fn h264(debit: u64) -> Vec<String> {
     let debit = debit.to_string();
-    ["-c:v", "libopenh264", "-rc_mode", "bitrate", "-b:v", &debit, "-pix_fmt", "yuv420p"]
-        .map(String::from)
-        .to_vec()
+    if cfg!(target_os = "macos") {
+        ["-c:v", "h264_videotoolbox", "-b:v", &debit, "-pix_fmt", "yuv420p"].map(String::from).to_vec()
+    } else {
+        ["-c:v", "libopenh264", "-rc_mode", "bitrate", "-b:v", &debit, "-pix_fmt", "yuv420p"]
+            .map(String::from)
+            .to_vec()
+    }
 }
 
 /// Codec vidéo VP9 (WebM), soit à qualité constante (`crf`), soit à débit fixe.

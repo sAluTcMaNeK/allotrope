@@ -1,0 +1,42 @@
+# Vérifications à chaque envoi sur GitHub : types de l'interface, compilation et tests du cœur Rust.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Dépendances JavaScript
+        run: npm ci
+
+      - name: Vérification des types (svelte-check)
+        run: npm run check
+
+      # Construit l'interface (dist/), nécessaire à la compilation de Tauri ; installe aussi FFmpeg
+      - name: Interface et FFmpeg
+        run: npm run build
+
+      - name: Tests Rust
+        working-directory: src-tauri
+        run: cargo test --lib

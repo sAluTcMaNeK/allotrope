@@ -1,0 +1,128 @@
+# FFmpeg (LGPL) : copie permanente des archives utilisées par scripts/telecharger-ffmpeg.mjs.
+#
+# - Windows et Linux : archives officielles de BtbN/FFmpeg-Builds, vérifiées (SHA-256) puis recopiées
+#   dans la publication « ffmpeg-9.0.2 » de ce dépôt (BtbN supprime ses publications après quelques semaines).
+# - macOS (puce Apple) : BtbN n'en fournit pas ; FFmpeg est compilé ici en LGPL, avec ses bibliothèques
+#   en statique (aucune dépendance à Homebrew chez l'utilisateur). H.264 passe par VideoToolbox
+#   (encodeur d'Apple, fourni avec le système) : OpenH264 n'est pas inclus.
+#
+# À lancer à la main une seule fois (onglet Actions › FFmpeg › Run workflow), puis recopier
+# l'empreinte macOS affichée à la fin dans scripts/telecharger-ffmpeg.mjs.
+name: FFmpeg
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ETIQUETTE: ffmpeg-9.0.2
+  BTBN: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-20-12-40
+  NOM_BTBN: ffmpeg-n9.0.2-61-gd59078794d
+
+jobs:
+  copier-btbn:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Télécharger et vérifier les archives Windows et Linux
+        run: |
+          curl -fL -o "$NOM_BTBN-win64-lgpl-9.0.zip" "$BTBN/$NOM_BTBN-win64-lgpl-9.0.zip"
+          curl -fL -o "$NOM_BTBN-linux64-lgpl-9.0.tar.xz" "$BTBN/$NOM_BTBN-linux64-lgpl-9.0.tar.xz"
+          cat > empreintes.txt <<EOF
+          814c62c35ca7e2b15d85b0a2a5b79bbf21783176520154f26a6df1e9df72761e  $NOM_BTBN-win64-lgpl-9.0.zip
+          56e74f65818998c92a15f743e0e65d9090312a5b2ff3ec8758bf911e770b99a3  $NOM_BTBN-linux64-lgpl-9.0.tar.xz
+          EOF
+          sed -i 's/^ *//' empreintes.txt
+          sha256sum -c empreintes.txt
+
+      - name: Créer la publication (si besoin) et y déposer les archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # --latest=false : cette publication ne doit jamais passer pour la dernière version d'Allotrope
+          gh release view "$ETIQUETTE" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$ETIQUETTE" -R "$GITHUB_REPOSITORY" --prerelease --latest=false \
+              --title "FFmpeg 9.0.2 (LGPL) pour Allotrope" \
+              --notes "Binaires FFmpeg sous licence LGPL utilisés par Allotrope. Sources : https://ffmpeg.org — builds Windows/Linux : https://github.com/BtbN/FFmpeg-Builds"
+          gh release upload "$ETIQUETTE" -R "$GITHUB_REPOSITORY" --clobber \
+            "$NOM_BTBN-win64-lgpl-9.0.zip" "$NOM_BTBN-linux64-lgpl-9.0.tar.xz"
+
+  compiler-macos:
+    needs: copier-btbn
+    runs-on: macos-14
+    env:
+      PREFIXE: ${{ github.workspace }}/prefixe
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - name: Outils de compilation
+        run: brew install nasm pkg-config autoconf automake libtool
+
+      - name: Bibliothèques (statiques) — LAME, Ogg, Vorbis, Opus, libvpx
+        run: |
+          set -euo pipefail
+          mkdir -p sources && cd sources
+          compiler() { ./configure --prefix="$PREFIXE" --enable-static --disable-shared "$@" && make -j"$(sysctl -n hw.ncpu)" && make install; }
+
+          curl -fL https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz | tar xz
+          (cd lame-3.100 && compiler --disable-frontend --disable-decoder)
+
+          curl -fL https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.gz | tar xz
+          (cd libogg-1.3.5 && compiler)
+
+          curl -fL https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.gz | tar xz
+          (cd libvorbis-1.3.7 && compiler --with-ogg="$PREFIXE")
+
+          curl -fL https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz | tar xz
+          (cd opus-1.5.2 && compiler --disable-doc --disable-extra-programs)
+
+          git clone --depth 1 --branch v1.15.0 https://chromium.googlesource.com/webm/libvpx
+          (cd libvpx && ./configure --prefix="$PREFIXE" --enable-static --disable-shared --disable-examples \
+            --disable-unit-tests --disable-tools --disable-docs --enable-vp9-highbitdepth \
+            && make -j"$(sysctl -n hw.ncpu)" && make install)
+
+      - name: FFmpeg 9.0.2 (LGPL)
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch n9.0.2 https://git.ffmpeg.org/ffmpeg.git ffmpeg
+          cd ffmpeg
+          # Pas de --enable-gpl ni --enable-nonfree : la build reste sous LGPL
+          PKG_CONFIG_PATH="$PREFIXE/lib/pkgconfig" PKG_CONFIG_LIBDIR="$PREFIXE/lib/pkgconfig" ./configure \
+            --prefix="$PREFIXE/ffmpeg" \
+            --pkg-config-flags="--static" \
+            --extra-cflags="-I$PREFIXE/include" \
+            --extra-ldflags="-L$PREFIXE/lib" \
+            --disable-ffplay --disable-ffprobe --disable-doc --disable-debug \
+            --enable-videotoolbox --enable-audiotoolbox \
+            --enable-libmp3lame --enable-libvorbis --enable-libopus --enable-libvpx
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+
+      - name: Vérifications (LGPL, pas de dépendance hors système)
+        run: |
+          set -euo pipefail
+          BIN="$PREFIXE/ffmpeg/bin/ffmpeg"
+          "$BIN" -hide_banner -buildconf | tee configuration.txt
+          if grep -q -- "--enable-gpl" configuration.txt; then echo "Build GPL refusée"; exit 1; fi
+          otool -L "$BIN" | tee liens.txt
+          # Seules les bibliothèques du système sont autorisées
+          if tail -n +2 liens.txt | grep -v -E "^\s+(/usr/lib/|/System/Library/)"; then
+            echo "Dépendance hors système détectée"; exit 1
+          fi
+          for codec in h264_videotoolbox libvpx-vp9 libmp3lame libvorbis libopus aac flac; do
+            "$BIN" -hide_banner -encoders | grep -q " $codec " || { echo "Encodeur absent : $codec"; exit 1; }
+          done
+
+      - name: Archive et publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NOM=ffmpeg-9.0.2-macos-arm64-lgpl
+          mkdir -p "$NOM/bin"
+          cp "$PREFIXE/ffmpeg/bin/ffmpeg" "$NOM/bin/ffmpeg"
+          cp ffmpeg/COPYING.LGPLv2.1 "$NOM/LICENSE.txt"
+          tar -cJf "$NOM.tar.xz" "$NOM"
+          gh release upload "$ETIQUETTE" -R "$GITHUB_REPOSITORY" --clobber "$NOM.tar.xz"
+          echo "## Empreinte macOS à recopier dans scripts/telecharger-ffmpeg.mjs" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$(shasum -a 256 "$NOM.tar.xz" | cut -d' ' -f1)\`" >> "$GITHUB_STEP_SUMMARY"

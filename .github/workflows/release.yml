@@ -1,0 +1,93 @@
+# Publication d'une version : construit les installateurs Windows, macOS et Linux, les signe pour
+# les mises à jour automatiques et les dépose dans un brouillon de publication GitHub (« Release »).
+#
+# Pour publier : mettre à jour la version (package.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json),
+# puis créer et envoyer une étiquette : git tag v0.2.0 && git push origin v0.2.0
+# Relire ensuite le brouillon sur GitHub et le publier : les applications installées le verront.
+#
+# Secrets à créer dans GitHub (Settings › Secrets and variables › Actions) :
+# - TAURI_SIGNING_PRIVATE_KEY : contenu de ~/.tauri/allotrope-updater.key (obligatoire)
+# - TAURI_SIGNING_PRIVATE_KEY_PASSWORD : mot de passe de la clé (vide si aucun)
+# Signature du code Windows (facultative, Azure Trusted Signing) :
+# - AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID (secrets)
+# - AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_ACCOUNT, AZURE_SIGNING_PROFILE (variables)
+name: Publication
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publier:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - plateforme: windows-latest
+            args: ""
+          - plateforme: ubuntu-22.04
+            args: ""
+          # Mac à puce Apple (M1 et suivants)
+          - plateforme: macos-14
+            args: "--target aarch64-apple-darwin"
+
+    runs-on: ${{ matrix.plateforme }}
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.plateforme == 'macos-14' && 'aarch64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Bibliothèques système (Linux)
+        if: matrix.plateforme == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Dépendances JavaScript
+        run: npm ci
+
+      # Signature du code Windows avec Azure Trusted Signing, seulement si les secrets existent
+      - name: Signature Windows (Azure Trusted Signing)
+        if: matrix.plateforme == 'windows-latest' && env.AZURE_CLIENT_ID != ''
+        shell: pwsh
+        run: |
+          cargo install trusted-signing-cli --locked
+          $commande = "trusted-signing-cli -e ${{ vars.AZURE_SIGNING_ENDPOINT }} -a ${{ vars.AZURE_SIGNING_ACCOUNT }} -c ${{ vars.AZURE_SIGNING_PROFILE }} -d Allotrope %1"
+          @{ bundle = @{ windows = @{ signCommand = $commande } } } | ConvertTo-Json -Depth 5 |
+            Out-File -Encoding utf8 src-tauri/tauri.signature.conf.json
+          "SIGNATURE_ARGS=--config src-tauri/tauri.signature.conf.json" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Allotrope v__VERSION__
+          releaseBody: "Voir les nouveautés ci-dessous. Toutes les conversions restent 100 % locales."
+          releaseDraft: true
+          prerelease: false
+          # latest.json : fichier lu par les mises à jour automatiques
+          includeUpdaterJson: true
+          args: --config src-tauri/tauri.release.conf.json ${{ env.SIGNATURE_ARGS }} ${{ matrix.args }}
