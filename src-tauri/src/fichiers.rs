@@ -80,6 +80,8 @@ fn analyser(chemin: &Path) -> Option<InfoFichier> {
     let famille = famille_depuis_extension(&extension);
 
     let (formats_sortie, compressible, dimensions) = match famille {
+        // Version portable : pas de FFmpeg, donc aucun traitement audio ou vidéo possible
+        Some(Famille::Video | Famille::Audio) if crate::PORTABLE => (Vec::new(), false, None),
         Some(Famille::Video | Famille::Audio) => (
             formats_sortie_media(&extension).into_iter().map(FormatSortie::Media).collect(),
             format_compression(&extension).is_some(),
@@ -112,7 +114,9 @@ fn analyser(chemin: &Path) -> Option<InfoFichier> {
 pub async fn analyser_fichiers(app: AppHandle, chemins: Vec<PathBuf>) -> Vec<InfoFichier> {
     let mut infos: Vec<InfoFichier> = chemins.iter().filter_map(|c| analyser(c)).collect();
     // Audio et vidéo : durée et définition lues par FFmpeg (quelques centièmes de seconde par fichier)
-    for info in infos.iter_mut().filter(|i| matches!(i.famille, Some(Famille::Video | Famille::Audio))) {
+    // (sauf dans la version portable, qui n'embarque pas FFmpeg)
+    let medias = infos.iter_mut().filter(|i| !crate::PORTABLE && matches!(i.famille, Some(Famille::Video | Famille::Audio)));
+    for info in medias {
         if let Ok(media) = media::infos(&app, &info.chemin).await {
             info.duree = media.duree;
             info.dimensions = media.largeur.zip(media.hauteur);

@@ -14,6 +14,7 @@
   } from "./fichiers";
   import { EXTENSIONS_DOCUMENT } from "./pdf/pdf";
   import { OUTILS_PDF, type IdOutil } from "./pdf/outils";
+  import { PORTABLE } from "./edition";
 
   interface Props {
     element: ElementFile;
@@ -81,6 +82,8 @@
 
   // Message affiché quand le fichier ne peut pas être traité par l'outil actif
   const indisponible = $derived.by(() => {
+    // La version portable n'embarque pas FFmpeg
+    if (PORTABLE && media) return "Disponible dans la version installée";
     if (info.extension === "pdf") return "Voir les Outils PDF";
     if (EXTENSIONS_DOCUMENT.includes(info.extension)) return "Voir Outils PDF › Word en PDF";
     if (!famille) return "Format non pris en charge";

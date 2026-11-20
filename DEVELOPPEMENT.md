@@ -51,6 +51,20 @@ npm run tauri build      # produit l'installateur Windows (src-tauri/target/rele
 npm run tauri icon chemin/vers/logo.png   # génère toutes les icônes à partir d'un PNG carré (1024×1024 conseillé)
 ```
 
+## Version portable (Windows)
+
+Même code, compilé avec l'option Cargo `portable` et la configuration `src-tauri/tauri.portable.conf.json` :
+identifiant distinct (`com.allotrope.portable`, réglages séparés de la version installée), pas de FFmpeg
+(ni audio ni vidéo), pas d'installateur, et mises à jour signalées par un simple lien.
+
+```powershell
+npm run tauri dev -- --features portable --config src-tauri/tauri.portable.conf.json     # essai
+npm run tauri build -- --no-bundle --features portable --config src-tauri/tauri.portable.conf.json
+```
+
+L'exécutable est produit dans `src-tauri/target/release/`. Le workflow de publication le compile et
+l'ajoute à chaque version sous le nom `Allotrope_<version>_x64_portable.exe`.
+
 ## Publier une version
 
 Les installateurs Windows, macOS (puce Apple) et Linux sont construits par GitHub Actions

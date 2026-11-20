@@ -52,8 +52,17 @@ Téléchargez le fichier correspondant à votre système sur la
 | Système | Fichier |
 |---|---|
 | **Windows 10 et 11** (64 bits) | `Allotrope_…_x64-setup.exe` |
+| **Windows, version portable** | `Allotrope_…_x64_portable.exe` (voir ci-dessous) |
 | **macOS 11 ou plus récent** (Mac à puce Apple : M1, M2…) | `Allotrope_…_aarch64.dmg` |
 | **Linux** (64 bits) | `.AppImage` (toutes distributions) ou `.deb` (Debian, Ubuntu…) |
+
+### Version portable (Windows)
+
+Un seul fichier à lancer depuis n'importe où (clé USB, dossier personnel…), sans installation.
+Elle est **plus légère** car elle n'embarque pas FFmpeg : **images et outils PDF uniquement, ni audio ni
+vidéo**. Pas de clic droit dans l'explorateur, et les mises à jour se font en téléchargeant le nouveau
+fichier. Elle est indépendante de la version installée : chacune garde ses propres réglages, rangés
+sur l'ordinateur utilisé.
 
 > **Windows affiche « Windows a protégé votre ordinateur » ?** L'installateur n'est pas encore
 > signé par un certificat payant. Cliquez sur *Informations complémentaires*, puis *Exécuter quand même*.

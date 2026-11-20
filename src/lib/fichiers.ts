@@ -1,5 +1,6 @@
 // Lien avec les modules Rust `fichiers`, `conversion`, `compression` et `media` (src-tauri/src/) et outils d'affichage.
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { PORTABLE } from "./edition";
 
 /** Familles de fichiers de la barre latérale (les PDF ont leur propre page : Outils PDF). */
 export type Famille = "image" | "video" | "audio";
@@ -282,7 +283,10 @@ export const FAMILLES: Record<
   },
 };
 
-export const LISTE_FAMILLES = Object.entries(FAMILLES) as [Famille, (typeof FAMILLES)[Famille]][];
+/** Familles proposées dans l'interface (la version portable, sans FFmpeg, ne traite que les images). */
+export const LISTE_FAMILLES = (Object.entries(FAMILLES) as [Famille, (typeof FAMILLES)[Famille]][]).filter(
+  ([id]) => !PORTABLE || id === "image",
+);
 
 const nombre = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 

@@ -10,6 +10,9 @@ mod pdf_images;
 
 use tauri::Manager;
 
+/// Vrai pour la version portable (option de compilation `portable`, voir Cargo.toml).
+pub const PORTABLE: bool = cfg!(feature = "portable");
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -19,6 +22,13 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, arguments, dossier_courant| {
             ouverture::nouvelle_instance(app, arguments, dossier_courant);
         }))
+        // Indique à l'interface, avant tout autre script, s'il s'agit de la version portable :
+        // c'est l'option de compilation Rust qui décide, l'interface ne fait que la lire.
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry, ()>::new("edition")
+                .js_init_script(format!("window.__ALLOTROPE_PORTABLE__ = {PORTABLE};"))
+                .build(),
+        )
         // Sélecteur de fichiers et de dossiers natif
         .plugin(tauri_plugin_dialog::init())
         // Afficher un fichier converti dans l'explorateur

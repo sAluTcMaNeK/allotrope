@@ -9,6 +9,7 @@
     "dev": "vite",
     "prebuild": "node scripts/copier-pdfjs.mjs && node scripts/telecharger-ffmpeg.mjs",
     "build": "vite build",
+    "build:portable": "node scripts/copier-pdfjs.mjs && vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",

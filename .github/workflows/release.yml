@@ -91,3 +91,18 @@ jobs:
           # latest.json : fichier lu par les mises à jour automatiques
           includeUpdaterJson: true
           args: --config src-tauri/tauri.release.conf.json ${{ env.SIGNATURE_ARGS }} ${{ matrix.args }}
+
+      # Version portable (Windows) : un seul .exe, sans FFmpeg ni installation.
+      # Elle n'est pas listée dans latest.json : les mises à jour automatiques ne la concernent pas.
+      - name: Version portable (Windows)
+        if: matrix.plateforme == 'windows-latest'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run tauri build -- --no-bundle --features portable --config src-tauri/tauri.portable.conf.json
+          $version = node -p "require('./package.json').version"
+          # Même nom de fichier que la version classique, compilée juste avant : l'exe est remplacé
+          $nom = "Allotrope_${version}_x64_portable.exe"
+          Copy-Item src-tauri/target/release/allotrope.exe $nom
+          gh release upload "v$version" $nom --clobber

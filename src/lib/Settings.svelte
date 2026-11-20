@@ -3,6 +3,8 @@
   import { onMount } from "svelte";
   import { getVersion } from "@tauri-apps/api/app";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { openUrl } from "@tauri-apps/plugin-opener";
+  import { PAGE_TELECHARGEMENT, PORTABLE } from "./edition";
   import { Download, FolderOpen, LoaderCircle, RefreshCw, ShieldCheck, X } from "@lucide/svelte";
   import { installerMiseAJour, miseAJour, rechercherMiseAJour } from "./mises-a-jour.svelte";
   import logo from "../../assets/allotrope-logo-complet.svg";
@@ -57,8 +59,13 @@
     ["jxl-oxide (JPEG XL)", "MIT / Apache 2.0"],
     ["lopdf (PDF)", "MIT"],
     ["pdf.js (Mozilla)", "Apache 2.0"],
-    ["FFmpeg (build LGPL, programme séparé)", "LGPL 2.1+"],
-    ["OpenH264 (Cisco)", "BSD"],
+    // FFmpeg n'est livré qu'avec la version installée
+    ...(PORTABLE
+      ? []
+      : [
+          ["FFmpeg (build LGPL, programme séparé)", "LGPL 2.1+"],
+          ["OpenH264 (Cisco)", "BSD"],
+        ]),
     ["Police Nunito", "SIL Open Font License"],
     ["Icônes Lucide", "ISC"],
   ];
@@ -134,7 +141,14 @@
     </label>
 
     <div class="mise-a-jour">
-      {#if miseAJour.etat.etape === "disponible"}
+      {#if miseAJour.etat.etape === "disponible" && PORTABLE}
+        <!-- Version portable : pas d'installation automatique, on remplace le fichier à la main -->
+        <button class="marque" onclick={() => openUrl(PAGE_TELECHARGEMENT)}>
+          <Download size={18} strokeWidth={2.6} />
+          Télécharger la version {miseAJour.etat.version}
+        </button>
+        <span class="aide">Remplacez ensuite ce fichier par le nouveau. Vos réglages sont conservés.</span>
+      {:else if miseAJour.etat.etape === "disponible"}
         <button class="marque" onclick={installerMiseAJour}>
           <Download size={18} strokeWidth={2.6} />
           Installer la version {miseAJour.etat.version}
@@ -165,14 +179,14 @@
     </div>
     <p class="note">
       Seule la recherche de mise à jour utilise internet (lecture du numéro de la dernière version).
-      Aucun fichier n'est envoyé. Chaque mise à jour est signée et vérifiée avant installation.
+      Aucun fichier n'est envoyé.{PORTABLE ? "" : " Chaque mise à jour est signée et vérifiée avant installation."}
     </p>
   </section>
 
   <section class="carte">
     <h2>À propos</h2>
     <img class="logo" src={logo} alt="Allotrope" draggable="false" />
-    <div class="version">Version {version}</div>
+    <div class="version">Version {version}{PORTABLE ? " · portable" : ""}</div>
     <div class="local">
       <span class="bouclier"><ShieldCheck size={22} strokeWidth={2.4} /></span>
       <div>
