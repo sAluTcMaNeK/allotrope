@@ -16,6 +16,7 @@
   --texte-secondaire: #a9bce0;
   --lien: #8ec2ff;
   --blanc: #ffffff; /* texte sur Cobalt et Améthyste */
+  --voile: rgb(10 26 63 / 0.85); /* Abysse à 85 % : fond derrière les fenêtres d'aperçu */
 
   /* Accents — par petites touches */
   --braise: #ff6a3d; /* documents, bouton principal */

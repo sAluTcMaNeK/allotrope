@@ -20,6 +20,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             fichiers::analyser_fichiers,
             conversion::convertir_image,
+            conversion::apercu_image,
             compression::compresser_image,
             media::infos_media,
             media::traiter_media,

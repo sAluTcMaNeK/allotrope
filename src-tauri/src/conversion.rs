@@ -144,6 +144,36 @@ pub fn convertir(
     Ok(ResultatConversion { chemin, taille: octets.len() as u64 })
 }
 
+/// Miniature d'une image pour l'aperçu avant / après, au format « data:image/… » (affichable
+/// directement par l'interface, sans lui ouvrir l'accès aux fichiers du disque).
+#[tauri::command]
+pub async fn apercu_image(chemin: PathBuf, cote_max: u32) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let octets = std::fs::read(&chemin).map_err(|e| format!("Impossible d'ouvrir le fichier : {e}"))?;
+        let image = lire(&octets, &extension_de(&chemin))?;
+        Ok(miniature_data_url(&image, cote_max.clamp(64, 2048)))
+    })
+    .await
+    .map_err(|e| format!("Aperçu interrompu : {e}"))?
+}
+
+/// Réduit l'image (sans jamais l'agrandir) puis l'encode : PNG si elle est transparente, JPEG sinon.
+pub fn miniature_data_url(image: &DynamicImage, cote_max: u32) -> String {
+    use base64::Engine;
+    let reduite = if image.width() > cote_max || image.height() > cote_max {
+        image.resize(cote_max, cote_max, FilterType::Triangle)
+    } else {
+        image.clone()
+    };
+    let (format, type_mime) = if reduite.color().has_alpha() {
+        (FormatImage::Png, "image/png")
+    } else {
+        (FormatImage::Jpeg, "image/jpeg")
+    };
+    let octets = encoder(&en_8_bits(&reduite), format, 88).unwrap_or_default();
+    format!("data:{type_mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(octets))
+}
+
 /// Nom du fichier sans son extension (« photo » pour « photo.png »).
 pub fn nom_sans_extension(chemin: &Path) -> String {
     chemin
@@ -476,6 +506,22 @@ pub mod tests {
         let grande = DynamicImage::ImageRgba8(RgbaImage::from_pixel(3000, 1500, Rgba([200, 30, 30, 255])));
         let svg = String::from_utf8(encoder(&grande, FormatImage::Svg, 85).unwrap()).unwrap();
         assert!(svg.contains(r#"width="3000" height="1500" viewBox="0 0 2000 1000""#), "{svg}");
+    }
+
+    #[test]
+    fn produit_une_miniature_reduite() {
+        let photo = DynamicImage::ImageRgb8(RgbImage::from_pixel(1200, 600, Rgb([10, 120, 200])));
+        let url = miniature_data_url(&photo, 300);
+        assert!(url.starts_with("data:image/jpeg;base64,"));
+        use base64::Engine;
+        let octets = base64::engine::general_purpose::STANDARD
+            .decode(url.trim_start_matches("data:image/jpeg;base64,"))
+            .unwrap();
+        let relue = lire(&octets, "jpg").unwrap();
+        assert_eq!((relue.width(), relue.height()), (300, 150));
+        // Une image transparente reste en PNG, et une petite image n'est pas agrandie
+        let icone = DynamicImage::ImageRgba8(RgbaImage::new(20, 10));
+        assert!(miniature_data_url(&icone, 300).starts_with("data:image/png;base64,"));
     }
 
     #[test]

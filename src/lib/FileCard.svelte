@@ -1,6 +1,6 @@
 <!-- Carte d'un fichier dans la file d'attente : choix du format (conversion) et état du traitement. -->
 <script lang="ts">
-  import { ArrowRight, Check, ChevronDown, Folder, LoaderCircle, X } from "@lucide/svelte";
+  import { ArrowRight, Check, ChevronDown, Columns2, Folder, LoaderCircle, X } from "@lucide/svelte";
   import {
     FAMILLES,
     LIBELLES_FORMAT,
@@ -22,10 +22,12 @@
     onformat: (format: FormatSortie) => void;
     onretirer: () => void;
     onouvrir: () => void;
+    /** Ouvre l'aperçu avant / après. */
+    onapercu: () => void;
     /** Arrête le traitement en cours (audio / vidéo). */
     onannuler: () => void;
   }
-  let { element, mode, typeCompression, onformat, onretirer, onouvrir, onannuler }: Props = $props();
+  let { element, mode, typeCompression, onformat, onretirer, onouvrir, onapercu, onannuler }: Props = $props();
 
   const info = $derived(element.info);
   const famille = $derived(info.famille ? FAMILLES[info.famille] : null);
@@ -125,6 +127,9 @@
       <Check size={16} strokeWidth={3} />
       Terminé
     </div>
+    <button class="carre" aria-label="Aperçu avant / après" title="Aperçu avant / après" onclick={onapercu}>
+      <Columns2 size={18} strokeWidth={2.4} />
+    </button>
     <button class="carre" aria-label="Afficher dans le dossier" onclick={onouvrir}>
       <Folder size={18} strokeWidth={2.4} />
     </button>

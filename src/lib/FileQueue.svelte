@@ -2,6 +2,7 @@
 <script lang="ts">
   import { Plus } from "@lucide/svelte";
   import FileCard from "./FileCard.svelte";
+  import Apercu from "./Apercu.svelte";
   import type { ElementFile, FormatSortie, Mode, TypeCompression } from "./fichiers";
 
   interface Props {
@@ -17,6 +18,10 @@
   }
   let { elements, mode, typeCompression, survol, onajouter, onretirer, onformat, onouvrir, onannuler }: Props =
     $props();
+
+  /** Chemin du fichier dont l'aperçu avant / après est ouvert. */
+  let enApercu = $state<string | null>(null);
+  const apercu = $derived(elements.find((e) => e.info.chemin === enApercu && e.etat === "termine" && e.resultat?.chemin));
 </script>
 
 <section class="file" aria-label="File d'attente">
@@ -41,9 +46,14 @@
         onretirer={() => onretirer(element.info.chemin)}
         onannuler={() => onannuler(element.info.chemin)}
         onouvrir={() => element.resultat?.chemin && onouvrir(element.resultat.chemin)}
+        onapercu={() => (enApercu = element.info.chemin)}
       />
     {/each}
   </div>
+
+  {#if apercu}
+    <Apercu element={apercu} {mode} {onouvrir} onfermer={() => (enApercu = null)} />
+  {/if}
 </section>
 
 <style>
