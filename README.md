@@ -54,7 +54,7 @@ Téléchargez le fichier correspondant à votre système sur la
 | **Windows 10 et 11** (64 bits) | `Allotrope_…_x64-setup.exe` |
 | **Windows, version portable** | `Allotrope_…_x64_portable.exe` (voir ci-dessous) |
 | **macOS 11 ou plus récent** (Mac à puce Apple : M1, M2…) | `Allotrope_…_aarch64.dmg` |
-| **Linux** (64 bits) | `.AppImage` (toutes distributions) ou `.deb` (Debian, Ubuntu…) |
+| **Linux** (64 bits) | `Allotrope_…_amd64.AppImage` (toutes distributions) |
 
 ### Version portable (Windows)
 

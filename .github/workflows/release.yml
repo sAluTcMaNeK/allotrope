@@ -106,3 +106,20 @@ jobs:
           $nom = "Allotrope_${version}_x64_portable.exe"
           Copy-Item src-tauri/target/release/allotrope.exe $nom
           gh release upload "v$version" $nom --clobber
+
+  # Les signatures (.sig) sont déjà recopiées dans latest.json, seul fichier lu par les mises à jour :
+  # on les retire de la publication, une fois toutes les plateformes construites, pour l'alléger.
+  nettoyer:
+    needs: publier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retirer les signatures .sig
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          gh release view "$version" --json assets -q '.assets[].name' | grep '\.sig$' | while read -r fichier; do
+            gh release delete-asset "$version" "$fichier" -y
+            echo "Retiré : $fichier"
+          done
