@@ -32,7 +32,7 @@ jobs:
           - plateforme: ubuntu-22.04
             args: ""
           # Mac à puce Apple (M1 et suivants)
-          - plateforme: macos-14
+          - plateforme: macos-latest
             args: "--target aarch64-apple-darwin"
 
     runs-on: ${{ matrix.plateforme }}
@@ -51,7 +51,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.plateforme == 'macos-14' && 'aarch64-apple-darwin' || '' }}
+          targets: ${{ matrix.plateforme == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
         with:
