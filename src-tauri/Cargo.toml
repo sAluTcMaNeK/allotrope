@@ -1,6 +1,6 @@
 [package]
 name = "allotrope"
-version = "0.1.0"
+version = "0.1.1"
 description = "Convertisseur de fichiers tout-en-un, 100 % local"
 authors = ["sAluTcMaNeK"]
 license = "MIT"
