@@ -1,84 +1,91 @@
-# Allotrope
+<p align="center">
+  <img src="assets/allotrope-logo.svg" alt="Allotrope" width="380">
+</p>
 
-Convertisseur de fichiers tout-en-un pour le bureau. Toutes les conversions se font en local : aucun fichier n'est envoyé sur internet.
+<p align="center">
+  <strong>Le même contenu, sous toutes ses formes.</strong><br>
+  Convertissez et compressez vos images, vidéos, sons et PDF en un glisser-déposer,<br>
+  sans qu'aucun fichier ne quitte votre ordinateur.
+</p>
 
-Construit avec [Tauri v2](https://v2.tauri.app) (cœur en Rust) et [Svelte](https://svelte.dev) + TypeScript (interface).
+<p align="center">
+  <a href="https://github.com/sAluTcMaNeK/allotrope/releases/latest"><strong>⬇ Télécharger Allotrope</strong></a>
+  &nbsp;·&nbsp; Gratuit &nbsp;·&nbsp; Windows, macOS, Linux
+</p>
 
-## Structure
+<!-- Captures d'écran : déposer les images dans docs/captures/ puis décommenter.
+<p align="center">
+  <img src="docs/captures/accueil.png" alt="Accueil d'Allotrope : zone de dépôt" width="800">
+</p>
+-->
 
-```
-allotrope/
-├── index.html            Page d'entrée de l'interface
-├── src/                  Interface (Svelte + TypeScript)
-├── public/               Fichiers statiques servis tels quels
-├── .github/workflows/    Vérifications, publication des versions, FFmpeg
-├── src-tauri/            Cœur de l'application (Rust)
-│   ├── src/              Code Rust (main.rs, lib.rs)
-│   ├── capabilities/     Permissions accordées à l'interface
-│   ├── icons/            Icônes de l'application
-│   ├── binaries/         Exécutables embarqués (FFmpeg, téléchargé)
-│   ├── windows/          Script de l'installateur (clic droit de l'explorateur)
-│   ├── Cargo.toml        Dépendances Rust
-│   └── tauri.conf.json   Configuration Tauri (fenêtre, installateur…)
-├── package.json          Dépendances et scripts JavaScript
-└── vite.config.ts        Serveur de développement de l'interface
-```
+## 100 % local
 
-## Installer l'environnement (Windows, une seule fois)
+Les convertisseurs en ligne envoient vos fichiers sur leurs serveurs. Allotrope fait tout **sur votre
+ordinateur** : vos photos, contrats et vidéos de famille restent sur votre disque. L'application
+fonctionne hors connexion ; internet ne sert qu'à vérifier, si vous le souhaitez, qu'une nouvelle
+version est disponible.
 
-Dans un terminal PowerShell :
+## Ce que fait Allotrope
 
-```powershell
-winget install Git.Git
-winget install OpenJS.NodeJS.LTS
-winget install Rustlang.Rustup
-winget install Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
-```
+| | |
+|---|---|
+| **Images** | JPG, PNG, WEBP, TIFF, BMP, GIF, ICO, JPEG XL… Conversion, compression réglable (taux ou taille cible), redimensionnement. **PNG → SVG** : vectorisation d'un logo. |
+| **Vidéo** | MOV, MP4, MKV, WEBM, GIF… Conversion, extraction du son, compression jusqu'à une taille cible (pour un e-mail par exemple), avec suivi en temps réel. |
+| **Audio** | MP3, M4A, OPUS, OGG, FLAC, WAV… Conversion avec suivi de l'avancement. |
+| **Outils PDF** | Fusionner, réorganiser ou supprimer des pages, compresser, extraire les images, PDF en images, PDF en Word / ODT, images en PDF, Word en PDF. |
 
-Fermer puis rouvrir le terminal, et vérifier :
+Et aussi :
 
-```powershell
-git --version
-node --version
-rustc --version
-```
+- **Traitement par lots** : déposez des dizaines de fichiers, ils sont traités en parallèle.
+- **Aperçu avant / après** avec le poids gagné.
+- **Préréglages** : enregistrez vos réglages favoris et retrouvez-les en un clic.
+- **Clic droit « Convertir avec Allotrope »** dans l'explorateur Windows.
+- **Vos originaux ne sont jamais modifiés** : chaque traitement crée un nouveau fichier.
+- **Mises à jour automatiques**, signées et vérifiées avant installation (désactivables).
 
-## Commandes
+## Installation
 
-```powershell
-npm install              # installe les dépendances JavaScript (la première fois)
-npm run tauri dev        # lance l'application en mode développement
-npm run tauri build      # produit l'installateur Windows (src-tauri/target/release/bundle/)
-npm run tauri icon chemin/vers/logo.png   # génère toutes les icônes à partir d'un PNG carré (1024×1024 conseillé)
-```
+Téléchargez le fichier correspondant à votre système sur la
+[page de la dernière version](https://github.com/sAluTcMaNeK/allotrope/releases/latest) :
 
-## Publier une version
+| Système | Fichier |
+|---|---|
+| **Windows 10 et 11** (64 bits) | `Allotrope_…_x64-setup.exe` |
+| **macOS 11 ou plus récent** (Mac à puce Apple : M1, M2…) | `Allotrope_…_aarch64.dmg` |
+| **Linux** (64 bits) | `.AppImage` (toutes distributions) ou `.deb` (Debian, Ubuntu…) |
 
-Les installateurs Windows, macOS (puce Apple) et Linux sont construits par GitHub Actions
-(`.github/workflows/release.yml`) quand une étiquette `v…` est envoyée :
+> **Windows affiche « Windows a protégé votre ordinateur » ?** L'installateur n'est pas encore
+> signé par un certificat payant. Cliquez sur *Informations complémentaires*, puis *Exécuter quand même*.
+>
+> **macOS refuse d'ouvrir l'application ?** Faites un clic droit sur Allotrope dans le dossier
+> Applications, puis *Ouvrir*.
 
-1. Mettre le même numéro de version dans `package.json`, `src-tauri/Cargo.toml` et `src-tauri/tauri.conf.json`.
-2. `git tag v0.2.0` puis `git push origin v0.2.0`.
-3. Relire le brouillon de publication créé sur GitHub (onglet *Releases*) et le publier.
-   Les copies d'Allotrope déjà installées proposeront alors la mise à jour.
+## Questions fréquentes
 
-### Préparatifs (une seule fois)
+**Faut-il Microsoft Word pour convertir un document en PDF ?**
+Allotrope utilise Word s'il est installé, sinon [LibreOffice](https://fr.libreoffice.org) (gratuit).
+Toutes les autres fonctions marchent sans logiciel supplémentaire.
 
-- **Secrets GitHub** (*Settings › Secrets and variables › Actions*) :
-  - `TAURI_SIGNING_PRIVATE_KEY` : contenu du fichier `~/.tauri/allotrope-updater.key`
-    (clé privée de signature des mises à jour ; **ne jamais la mettre dans Git**, la sauvegarder hors de l'ordinateur) ;
-  - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` : laisser vide (clé sans mot de passe).
-- **FFmpeg** : lancer une fois le workflow *FFmpeg* (onglet *Actions*), puis recopier l'empreinte macOS
-  qu'il affiche dans `scripts/telecharger-ffmpeg.mjs`.
-- **Signature du code Windows** (facultatif, recommandé pour éviter l'avertissement SmartScreen) :
-  compte [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/), puis secrets
-  `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` et variables `AZURE_SIGNING_ENDPOINT`,
-  `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE`. Sans eux, l'installateur est simplement non signé.
+**Où sont enregistrés les fichiers produits ?**
+Par défaut dans `Documents/Allotrope`. Vous pouvez choisir un autre dossier, ou le dossier d'origine
+de chaque fichier, dans les Paramètres.
 
-Pour produire localement un installateur avec les fichiers de mise à jour signés :
+**Comment signaler un problème ou proposer une idée ?**
+Ouvrez un [ticket (*issue*)](https://github.com/sAluTcMaNeK/allotrope/issues).
 
-```powershell
-$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw "$HOME\.tauri\allotrope-updater.key"
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
-npm run tauri build -- --config src-tauri/tauri.release.conf.json
-```
+## Composants open source
+
+Allotrope s'appuie notamment sur [Tauri](https://tauri.app), [Svelte](https://svelte.dev),
+[FFmpeg](https://ffmpeg.org) (build LGPL, livrée comme programme séparé avec sa licence),
+[pdf.js](https://mozilla.github.io/pdf.js/), [vtracer](https://github.com/visioncortex/vtracer),
+[lopdf](https://github.com/J-F-Liu/lopdf), la police Nunito et les icônes [Lucide](https://lucide.dev).
+La liste complète figure dans l'application, rubrique *Paramètres › À propos*.
+
+## Contribuer
+
+Le guide pour compiler Allotrope et publier une version se trouve dans [DEVELOPPEMENT.md](DEVELOPPEMENT.md).
+
+## Licence
+
+Allotrope est distribué sous [licence MIT](LICENSE).

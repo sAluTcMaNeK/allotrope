@@ -3,6 +3,7 @@ name = "allotrope"
 version = "0.1.0"
 description = "Convertisseur de fichiers tout-en-un, 100 % local"
 authors = ["sAluTcMaNeK"]
+license = "MIT"
 edition = "2021"
 
 [lib]
