@@ -95,15 +95,13 @@
         >
           {prereglage.nom}
         </button>
-        {#if !prereglage.integre}
-          <button
-            class="supprimer"
-            aria-label={`Supprimer le préréglage « ${prereglage.nom} »`}
-            onclick={() => onsupprimer(prereglage.id)}
-          >
-            <X size={16} strokeWidth={2.6} />
-          </button>
-        {/if}
+        <button
+          class="supprimer"
+          aria-label={`Supprimer le préréglage « ${prereglage.nom} »`}
+          onclick={() => onsupprimer(prereglage.id)}
+        >
+          <X size={16} strokeWidth={2.6} />
+        </button>
       </div>
     {/each}
 

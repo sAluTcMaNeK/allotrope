@@ -4,6 +4,7 @@
   import FileCard from "./FileCard.svelte";
   import Apercu from "./Apercu.svelte";
   import type { ElementFile, FormatSortie, Mode, TypeCompression } from "./fichiers";
+  import type { IdOutil } from "./pdf/outils";
 
   interface Props {
     elements: ElementFile[];
@@ -15,8 +16,10 @@
     onformat: (chemin: string, format: FormatSortie) => void;
     onannuler: (chemin: string) => void;
     onouvrir: (chemin: string) => void;
+    /** Ouvre un outil PDF avec ce fichier (PDF ou document Word / ODT). */
+    onoutilpdf: (chemin: string, outil: IdOutil) => void;
   }
-  let { elements, mode, typeCompression, survol, onajouter, onretirer, onformat, onouvrir, onannuler }: Props =
+  let { elements, mode, typeCompression, survol, onajouter, onretirer, onformat, onouvrir, onannuler, onoutilpdf }: Props =
     $props();
 
   /** Chemin du fichier dont l'aperçu avant / après est ouvert. */
@@ -47,6 +50,7 @@
         onannuler={() => onannuler(element.info.chemin)}
         onouvrir={() => element.resultat?.chemin && onouvrir(element.resultat.chemin)}
         onapercu={() => (enApercu = element.info.chemin)}
+        onoutilpdf={(outil) => onoutilpdf(element.info.chemin, outil)}
       />
     {/each}
   </div>

@@ -42,7 +42,8 @@ function charger(): Reglages {
       dossierPersonnalise: lus.dossierPersonnalise ?? DEFAUTS.dossierPersonnalise,
       qualite: lus.qualite ?? DEFAUTS.qualite,
       compression: { ...DEFAUTS.compression, ...lus.compression },
-      prereglages: Array.isArray(lus.prereglages) ? lus.prereglages : [],
+      // Préréglages de l'utilisateur, sans ceux d'anciennes versions qui ouvraient les Outils PDF
+      prereglages: Array.isArray(lus.prereglages) ? lus.prereglages.filter((p: Prereglage) => (p.cible as string) !== "pdf") : [],
       miseAJourAuto: lus.miseAJourAuto ?? DEFAUTS.miseAJourAuto,
     };
   } catch {

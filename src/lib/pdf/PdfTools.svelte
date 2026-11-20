@@ -1,7 +1,6 @@
 <!-- Page « Outils PDF » : grille de cartouches carrées ; un clic ouvre l'outil correspondant. -->
 <script lang="ts">
-  import type { Component } from "svelte";
-  import { ArrowDownUp, FileText, FileType, ImageDown, ImagePlus, Images, Layers, Shrink, Trash } from "@lucide/svelte";
+  import { tick } from "svelte";
   import FusionTool from "./FusionTool.svelte";
   import PagesTool from "./PagesTool.svelte";
   import ImagesTool from "./ImagesTool.svelte";
@@ -10,105 +9,25 @@
   import PdfEnImagesTool from "./PdfEnImagesTool.svelte";
   import PdfVersTexteTool from "./PdfVersTexteTool.svelte";
   import DocumentVersPdfTool from "./DocumentVersPdfTool.svelte";
-
-  import type { OptionsCompression } from "../fichiers";
+  import { depot } from "../depot.svelte";
+  import { OUTILS_PDF as OUTILS, type DemandeOutilPdf, type IdOutil } from "./outils";
 
   interface Props {
-    /** Demande d'ouverture d'un outil (préréglage) ; `jeton` change à chaque nouvelle demande. */
-    demande?: { outil: "compresser"; compression: OptionsCompression; jeton: number } | null;
+    /** Outil à ouvrir directement, avec ses fichiers (choisi depuis une carte de l'accueil). */
+    demande?: DemandeOutilPdf | null;
   }
   let { demande = null }: Props = $props();
 
-  type IdOutil =
-    | "fusionner"
-    | "reorganiser"
-    | "supprimer"
-    | "images"
-    | "compresser"
-    | "extraire-images"
-    | "en-images"
-    | "pdf-texte"
-    | "word";
-
-  interface Outil {
-    id: IdOutil;
-    titre: string;
-    description: string;
-    icone: Component<{ size?: number; strokeWidth?: number }>;
-    /** Outil pas encore disponible : la cartouche est affichée mais inactive. */
-    bientot?: string;
-  }
-
-  const OUTILS: Outil[] = [
-    {
-      id: "fusionner",
-      titre: "Fusionner des PDF",
-      description: "Assemblez plusieurs PDF en un seul document.",
-      icone: Layers,
-    },
-    {
-      id: "reorganiser",
-      titre: "Réorganiser les pages",
-      description: "Changez l'ordre des pages et faites-les pivoter.",
-      icone: ArrowDownUp,
-    },
-    {
-      id: "supprimer",
-      titre: "Supprimer des pages",
-      description: "Retirez les pages inutiles d'un PDF.",
-      icone: Trash,
-    },
-    {
-      id: "images",
-      titre: "Images en PDF",
-      description: "Une photo ou un scan par page, dans l'ordre choisi.",
-      icone: ImagePlus,
-    },
-    {
-      id: "compresser",
-      titre: "Compresser un PDF",
-      description: "Allégez un PDF pour l'envoyer par e-mail.",
-      icone: Shrink,
-    },
-    {
-      id: "extraire-images",
-      titre: "Extraire les images",
-      description: "Récupérez les photos d'un PDF, une à une ou toutes en ZIP.",
-      icone: ImageDown,
-    },
-    {
-      id: "en-images",
-      titre: "PDF en images",
-      description: "Exportez chaque page en PNG, JPG ou WEBP.",
-      icone: Images,
-    },
-    {
-      id: "pdf-texte",
-      titre: "PDF en Word / ODT",
-      description: "Rendez un PDF modifiable : DOCX ou ODT.",
-      icone: FileType,
-    },
-    {
-      id: "word",
-      titre: "Word en PDF",
-      description: "Transformez un document Word ou ODT en PDF.",
-      icone: FileText,
-    },
-  ];
-
   let ouvert = $state<IdOutil | null>(null);
-  /** Réglages du préréglage, valables tant que l'outil qu'il a ouvert reste affiché. */
-  let compressionDemandee = $state<OptionsCompression | null>(null);
-  const retour = () => {
-    ouvert = null;
-    compressionDemandee = null;
-  };
+  const retour = () => (ouvert = null);
 
-  // Un préréglage ouvre directement l'outil demandé
+  // Ouvre l'outil demandé, puis lui transmet les fichiers comme s'ils y avaient été déposés :
+  // chaque outil s'inscrit comme destinataire des dépôts quand il s'affiche.
   $effect(() => {
     if (!demande) return;
-    ouvert = demande.outil;
-    compressionDemandee = demande.compression;
+    const { outil, fichiers } = demande;
+    ouvert = outil;
+    tick().then(() => depot.cible?.(fichiers));
   });
 </script>
 
@@ -121,9 +40,7 @@
 {:else if ouvert === "images"}
   <ImagesTool onretour={retour} />
 {:else if ouvert === "compresser"}
-  {#key demande?.jeton}
-    <CompressionPdfTool onretour={retour} reglagesInitiaux={compressionDemandee} />
-  {/key}
+  <CompressionPdfTool onretour={retour} />
 {:else if ouvert === "extraire-images"}
   <ExtractionImagesTool onretour={retour} />
 {:else if ouvert === "en-images"}

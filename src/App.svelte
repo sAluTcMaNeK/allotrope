@@ -37,7 +37,9 @@
     type OptionsCompression,
   } from "./lib/fichiers";
   import type { Page } from "./lib/navigation";
-  import { PREREGLAGES_INTEGRES, nouvelIdentifiant, type Prereglage } from "./lib/prereglages";
+  import { nouvelIdentifiant, type Prereglage } from "./lib/prereglages";
+  import type { DemandeOutilPdf, IdOutil } from "./lib/pdf/outils";
+  import { EXTENSIONS_DOCUMENT } from "./lib/pdf/pdf";
   import { reglages } from "./lib/reglages.svelte";
   import { miseAJour, rechercherMiseAJour } from "./lib/mises-a-jour.svelte";
 
@@ -63,12 +65,10 @@
   // Réglages de compression de la session, initialisés avec les valeurs par défaut des paramètres
   let compression = $state<OptionsCompression>({ ...reglages.compression });
 
-  /** Préréglages intégrés puis ceux de l'utilisateur. */
-  const prereglages = $derived([...PREREGLAGES_INTEGRES, ...reglages.prereglages]);
   /** Préréglage appliqué en dernier ; oublié dès que l'on change un réglage ou de page. */
   let prereglageActif = $state<string | null>(null);
-  /** Outil PDF à ouvrir par un préréglage. */
-  let demandePdf = $state<{ outil: "compresser"; compression: OptionsCompression; jeton: number } | null>(null);
+  /** Outil PDF à ouvrir avec des fichiers de l'accueil (menu « Outil PDF » d'une carte). */
+  let demandePdf = $state<DemandeOutilPdf | null>(null);
 
   /** Famille de la page affichée, ou `null` sur l'accueil. */
   const famille = $derived<Famille | null>(
@@ -107,16 +107,26 @@
       return;
     }
     naviguer(prereglage.cible);
-    if (prereglage.cible === "pdf") {
-      if (prereglage.compression) {
-        demandePdf = { outil: "compresser", compression: { ...prereglage.compression }, jeton: Date.now() };
-      }
-    } else {
-      changerMode(prereglage.mode);
-      if (prereglage.mode === "convertir" && prereglage.format) changerCible(prereglage.format);
-      if (prereglage.mode === "compresser" && prereglage.compression) changerCompression(prereglage.compression);
-    }
+    changerMode(prereglage.mode);
+    if (prereglage.mode === "convertir" && prereglage.format) changerCible(prereglage.format);
+    if (prereglage.mode === "compresser" && prereglage.compression) changerCompression(prereglage.compression);
     prereglageActif = prereglage.id;
+  }
+
+  /**
+   * Ouvre un outil PDF avec le fichier choisi sur l'accueil, suivi des autres fichiers du même
+   * genre (PDF, ou documents Word / ODT / RTF) de la file : utile pour fusionner ou traiter un lot.
+   * Les outils qui ne prennent qu'un fichier gardent le premier, c'est-à-dire celui choisi.
+   */
+  function ouvrirOutilPdf(chemin: string, outil: IdOutil) {
+    const element = elements.find((e) => e.info.chemin === chemin);
+    if (!element) return;
+    const document = EXTENSIONS_DOCUMENT.includes(element.info.extension);
+    const memeGenre = (e: ElementFile) =>
+      document ? EXTENSIONS_DOCUMENT.includes(e.info.extension) : e.info.extension === "pdf";
+    const autres = elements.filter((e) => e !== element && memeGenre(e)).map((e) => e.info.chemin);
+    naviguer("pdf");
+    demandePdf = { outil, fichiers: [chemin, ...autres] };
   }
 
   /** Enregistre l'outil et les réglages de la page affichée sous forme de préréglage. */
@@ -354,7 +364,7 @@
       {page}
       {compteurs}
       onnaviguer={naviguer}
-      {prereglages}
+      prereglages={reglages.prereglages}
       {prereglageActif}
       onprereglage={appliquerPrereglage}
       onenregistrer={enregistrerPrereglage}
@@ -403,6 +413,7 @@
                 onretirer={retirer}
                 onformat={changerFormat}
                 onannuler={(chemin) => annulerMedia(chemin)}
+                onoutilpdf={ouvrirOutilPdf}
                 onouvrir={(chemin) => revealItemInDir(chemin)}
               />
             {/if}

@@ -13,6 +13,7 @@
     type TypeCompression,
   } from "./fichiers";
   import { EXTENSIONS_DOCUMENT } from "./pdf/pdf";
+  import { OUTILS_PDF, type IdOutil } from "./pdf/outils";
 
   interface Props {
     element: ElementFile;
@@ -26,8 +27,11 @@
     onapercu: () => void;
     /** Arrête le traitement en cours (audio / vidéo). */
     onannuler: () => void;
+    /** Ouvre l'outil PDF choisi avec ce fichier. */
+    onoutilpdf: (outil: IdOutil) => void;
   }
-  let { element, mode, typeCompression, onformat, onretirer, onouvrir, onapercu, onannuler }: Props = $props();
+  let { element, mode, typeCompression, onformat, onretirer, onouvrir, onapercu, onannuler, onoutilpdf }: Props =
+    $props();
 
   const info = $derived(element.info);
   const famille = $derived(info.famille ? FAMILLES[info.famille] : null);
@@ -66,6 +70,13 @@
     if (info.dimensions) details.push(`${info.dimensions[0]} × ${info.dimensions[1]}`);
     if (info.duree) details.push(dureeLisible(info.duree));
     return details.join(" · ");
+  });
+
+  /** Outils PDF proposés pour ce fichier : ceux qui prennent un PDF, ou « Word en PDF » pour un document. */
+  const outilsPdf = $derived.by(() => {
+    if (info.extension === "pdf") return OUTILS_PDF.filter((o) => o.entree === "pdf" && !o.bientot);
+    if (EXTENSIONS_DOCUMENT.includes(info.extension)) return OUTILS_PDF.filter((o) => o.entree === "document");
+    return [];
   });
 
   // Message affiché quand le fichier ne peut pas être traité par l'outil actif
@@ -144,6 +155,21 @@
     <div class="etat">Annulé</div>
   {:else if element.etat === "erreur"}
     <div class="etat echec">Échec</div>
+  {:else if outilsPdf.length > 0}
+    <!-- PDF ou document : choix d'un outil PDF, qui s'ouvre avec ce fichier -->
+    <label class="selecteur">
+      <select
+        aria-label={`Outil PDF pour ${info.nom}`}
+        value=""
+        onchange={(e) => onoutilpdf(e.currentTarget.value as IdOutil)}
+      >
+        <option value="" disabled>Outil PDF…</option>
+        {#each outilsPdf as outil (outil.id)}
+          <option value={outil.id}>{outil.titre}</option>
+        {/each}
+      </select>
+      <span class="chevron"><ChevronDown size={14} strokeWidth={3} /></span>
+    </label>
   {:else}
     <div class="etat">{actif ? "En attente" : indisponible}</div>
   {/if}

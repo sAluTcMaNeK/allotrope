@@ -19,10 +19,8 @@
 
   interface Props {
     onretour: () => void;
-    /** Réglages imposés par un préréglage ; sinon, compression par défaut des Paramètres. */
-    reglagesInitiaux?: OptionsCompression | null;
   }
-  let { onretour, reglagesInitiaux = null }: Props = $props();
+  let { onretour }: Props = $props();
 
   interface Fichier {
     chemin: string;
@@ -35,8 +33,7 @@
 
   let fichiers = $state<Fichier[]>([]);
   // Réglages de la session, initialisés avec la compression par défaut des Paramètres
-  // svelte-ignore state_referenced_locally (seule la valeur initiale compte)
-  let options = $state<OptionsCompression>({ ...(reglagesInitiaux ?? reglages.compression) });
+  let options = $state<OptionsCompression>({ ...reglages.compression });
   let enCours = $state(false);
   let message = $state<string | null>(null);
 
