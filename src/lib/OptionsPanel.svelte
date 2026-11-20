@@ -47,6 +47,13 @@
           />
         </span>
       </div>
+      {#if famille === "image" && cible === "svg"}
+        <p class="note">
+          <Info size={16} strokeWidth={2.6} />
+          La vectorisation trace les contours de chaque zone de couleur : idéale pour les logos, icônes et
+          dessins en aplats. Une photo devient une image aux couleurs simplifiées, façon affiche.
+        </p>
+      {/if}
     {:else if !indisponible}
       <CompressionFields id="file" options={compression} onchange={oncompression} {desactive} {famille} />
       {#if famille === "audio"}

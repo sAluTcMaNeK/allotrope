@@ -3,7 +3,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 
 /** Familles de fichiers de la barre latérale (les PDF ont leur propre page : Outils PDF). */
 export type Famille = "image" | "video" | "audio";
-export type FormatImage = "jpeg" | "png" | "webp" | "bmp" | "tiff" | "gif" | "ico" | "tga" | "qoi";
+export type FormatImage = "jpeg" | "png" | "webp" | "svg" | "bmp" | "tiff" | "gif" | "ico" | "tga" | "qoi";
 export type FormatMedia = "mp4" | "webm" | "mkv" | "mov" | "gif" | "mp3" | "m4a" | "ogg" | "opus" | "flac" | "wav";
 /** Format de sortie : image, ou audio / vidéo (selon la famille du fichier source). */
 export type FormatSortie = FormatImage | FormatMedia;
@@ -192,6 +192,7 @@ export const LIBELLES_FORMAT: Record<FormatSortie, string> = {
   jpeg: "JPG",
   png: "PNG",
   webp: "WEBP",
+  svg: "SVG",
   tiff: "TIFF",
   bmp: "BMP",
   gif: "GIF",
@@ -232,7 +233,7 @@ export const FAMILLES: Record<
       "qoi", "pbm", "pgm", "ppm", "pnm", "pam", "hdr", "exr", "dds", "ff", "svg", "svgz", "jxl",
       "heic", "heif", "avif",
     ],
-    cibles: (["jpeg", "png", "webp", "tiff", "bmp", "gif", "ico", "tga", "qoi"] as FormatImage[]).map((id) => ({
+    cibles: (["jpeg", "png", "webp", "svg", "tiff", "bmp", "gif", "ico", "tga", "qoi"] as FormatImage[]).map((id) => ({
       id,
       libelle: LIBELLES_FORMAT[id],
     })),

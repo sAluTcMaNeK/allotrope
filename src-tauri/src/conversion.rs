@@ -22,13 +22,16 @@ pub enum FormatImage {
     Ico,
     Tga,
     Qoi,
+    /// Image vectorielle, obtenue par vectorisation (crate `vtracer`).
+    Svg,
 }
 
 /// Tous les formats de sortie, dans l'ordre où ils sont proposés.
-const FORMATS_SORTIE: [FormatImage; 9] = [
+const FORMATS_SORTIE: [FormatImage; 10] = [
     FormatImage::Png,
     FormatImage::Jpeg,
     FormatImage::Webp,
+    FormatImage::Svg,
     FormatImage::Tiff,
     FormatImage::Bmp,
     FormatImage::Gif,
@@ -49,6 +52,7 @@ impl FormatImage {
             FormatImage::Ico => "ico",
             FormatImage::Tga => "tga",
             FormatImage::Qoi => "qoi",
+            FormatImage::Svg => "svg",
         }
     }
 
@@ -64,13 +68,16 @@ impl FormatImage {
             "ico" => Some(FormatImage::Ico),
             "tga" => Some(FormatImage::Tga),
             "qoi" => Some(FormatImage::Qoi),
+            "svg" | "svgz" => Some(FormatImage::Svg),
             _ => None,
         }
     }
 
     /// Format équivalent de la crate `image`, pour les encodeurs génériques.
+    /// Le SVG n'en a pas : il passe par la vectorisation (`vectoriser`).
     fn format_image(self) -> ImageFormat {
         match self {
+            FormatImage::Svg => unreachable!("le SVG est produit par vectoriser()"),
             FormatImage::Jpeg => ImageFormat::Jpeg,
             FormatImage::Png => ImageFormat::Png,
             FormatImage::Webp => ImageFormat::WebP,
@@ -272,11 +279,48 @@ pub fn encoder(image: &DynamicImage, format: FormatImage, qualite: u8) -> Result
             curseur.get_mut().extend_from_slice(&memoire);
             Ok(())
         }
+        FormatImage::Svg => {
+            curseur.get_mut().extend_from_slice(vectoriser(image)?.as_bytes());
+            Ok(())
+        }
         // BMP, GIF, TGA, QOI (et PNG / TIFF flottants) : pixels 8 bits
         _ => en_8_bits(image).write_to(&mut curseur, format.format_image()),
     };
     resultat.map_err(|e| format!("Échec de l'encodage : {e}"))?;
     Ok(octets)
+}
+
+/// Côté le plus long (en pixels) de l'image analysée pour la vectorisation : au-delà, le calcul
+/// devient très long et le SVG énorme, sans gain visible.
+const TAILLE_MAX_VECTORISATION: u32 = 2000;
+
+/// Vectorise une image (tracé des contours de chaque zone de couleur) et renvoie le texte SVG.
+/// Excellent sur les logos, icônes et dessins en aplats ; une photo devient une sorte d'affiche
+/// aux couleurs simplifiées.
+fn vectoriser(image: &DynamicImage) -> Result<String, String> {
+    let (largeur, hauteur) = (image.width(), image.height());
+    let analysee = if largeur.max(hauteur) > TAILLE_MAX_VECTORISATION {
+        image.resize(TAILLE_MAX_VECTORISATION, TAILLE_MAX_VECTORISATION, FilterType::Lanczos3)
+    } else {
+        image.clone()
+    };
+    let rgba = analysee.to_rgba8();
+    let couleurs = vtracer::ColorImage {
+        width: rgba.width() as usize,
+        height: rgba.height() as usize,
+        pixels: rgba.into_raw(),
+    };
+    // Réglages par défaut de vtracer : couleur, courbes lissées (splines), zones empilées
+    let svg = vtracer::convert(couleurs, vtracer::Config::default())
+        .map_err(|e| format!("Échec de la vectorisation : {e}"))?;
+    let (l, h) = (svg.width, svg.height);
+    let texte = svg.to_string();
+    // Le dessin garde les dimensions de l'image d'origine, même s'il a été calculé en plus petit
+    Ok(texte.replacen(
+        &format!(r#"width="{l}" height="{h}">"#),
+        &format!(r#"width="{largeur}" height="{hauteur}" viewBox="0 0 {l} {h}">"#),
+        1,
+    ))
 }
 
 /// Écrit `octets` dans `dossier/nom.extension` (ou `nom (2).extension`…) et renvoie le chemin choisi.
@@ -358,8 +402,10 @@ pub mod tests {
         assert!(!formats_sortie("png").contains(&FormatImage::Png));
         assert_eq!(formats_sortie("jpeg")[0], FormatImage::Png);
         assert_eq!(formats_sortie("bmp").len(), FORMATS_SORTIE.len() - 1);
+        // Le SVG est déjà vectoriel : on ne le propose pas en sortie d'un SVG
+        assert!(!formats_sortie("svg").contains(&FormatImage::Svg));
+        assert!(formats_sortie("png").contains(&FormatImage::Svg));
         // Formats lus mais pas produits : tous les formats de sortie sont proposés
-        assert_eq!(formats_sortie("svg").len(), FORMATS_SORTIE.len());
         assert_eq!(formats_sortie("exr").len(), FORMATS_SORTIE.len());
         assert!(formats_sortie("heic").is_empty());
         assert!(formats_sortie("mp4").is_empty());
@@ -376,9 +422,11 @@ pub mod tests {
                 .unwrap_or_else(|e| panic!("{format:?} : {e}"));
             assert_eq!(res.chemin.extension().unwrap(), format.extension());
             assert!(res.taille > 0);
-            // Relecture du fichier produit (par son extension, nécessaire pour le TGA)
+            // Relecture du fichier produit (par son extension, nécessaire pour le TGA).
+            // Le SVG relu est agrandi au rendu : seules ses proportions comptent.
             let relue = lire(&std::fs::read(&res.chemin).unwrap(), format.extension()).unwrap();
-            assert_eq!((relue.width(), relue.height()), (4, 2), "{format:?}");
+            let attendu = if format == FormatImage::Svg { (1024, 512) } else { (4, 2) };
+            assert_eq!((relue.width(), relue.height()), attendu, "{format:?}");
         }
         std::fs::remove_dir_all(&dossier).unwrap();
     }
@@ -403,6 +451,31 @@ pub mod tests {
             assert!(!octets.is_empty());
         }
         std::fs::remove_dir_all(&dossier).unwrap();
+    }
+
+    #[test]
+    fn vectorise_un_logo_en_svg() {
+        // Disque bleu sur fond blanc : le SVG doit contenir un tracé bleu et garder la taille d'origine
+        let mut img = RgbaImage::from_pixel(64, 64, Rgba([255, 255, 255, 255]));
+        for (x, y, p) in img.enumerate_pixels_mut() {
+            let (dx, dy) = (x as i32 - 32, y as i32 - 32);
+            if dx * dx + dy * dy < 400 {
+                *p = Rgba([0x1F, 0x5B, 0xFF, 255]);
+            }
+        }
+        let octets = encoder(&DynamicImage::ImageRgba8(img), FormatImage::Svg, 85).unwrap();
+        let svg = String::from_utf8(octets).unwrap();
+        assert!(svg.contains(r#"width="64" height="64""#), "{svg}");
+        assert!(svg.to_uppercase().contains("#1F5BFF"), "{svg}");
+        // Le résultat est un SVG valide, relisible par resvg
+        lire(svg.as_bytes(), "svg").unwrap();
+    }
+
+    #[test]
+    fn vectorise_une_grande_image_en_gardant_ses_dimensions() {
+        let grande = DynamicImage::ImageRgba8(RgbaImage::from_pixel(3000, 1500, Rgba([200, 30, 30, 255])));
+        let svg = String::from_utf8(encoder(&grande, FormatImage::Svg, 85).unwrap()).unwrap();
+        assert!(svg.contains(r#"width="3000" height="1500" viewBox="0 0 2000 1000""#), "{svg}");
     }
 
     #[test]
