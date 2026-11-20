@@ -37,12 +37,12 @@ const BUILDS = {
     licence: "LICENSE.txt",
   },
   // BtbN ne publie pas de build macOS : elle est compilée par .github/workflows/ffmpeg.yml.
-  // Après la première exécution de ce workflow, recopier ici l'empreinte qu'il affiche.
+  // Si ce workflow est relancé, l'archive change : recopier ici la nouvelle empreinte qu'il affiche.
   "darwin-arm64": {
     cible: "aarch64-apple-darwin",
     archive: "ffmpeg-9.0.2-macos-arm64-lgpl.tar.xz",
     sources: [MIROIR],
-    sha256: null,
+    sha256: "4f6358b0d58a5de3e2ef32c9de6655d32a542e13d20c46e32cc816beab5ed75e",
     dossier: "ffmpeg-9.0.2-macos-arm64-lgpl",
     executable: "bin/ffmpeg",
     licence: "LICENSE.txt",
