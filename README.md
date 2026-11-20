@@ -11,8 +11,7 @@ allotrope/
 ├── index.html            Page d'entrée de l'interface
 ├── src/                  Interface (Svelte + TypeScript)
 ├── public/               Fichiers statiques servis tels quels
-├── site/                 Site de présentation (GitHub Pages)
-├── .github/workflows/    Vérifications, publication des versions, FFmpeg, site
+├── .github/workflows/    Vérifications, publication des versions, FFmpeg
 ├── src-tauri/            Cœur de l'application (Rust)
 │   ├── src/              Code Rust (main.rs, lib.rs)
 │   ├── capabilities/     Permissions accordées à l'interface
@@ -75,7 +74,6 @@ Les installateurs Windows, macOS (puce Apple) et Linux sont construits par GitHu
   compte [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/), puis secrets
   `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` et variables `AZURE_SIGNING_ENDPOINT`,
   `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE`. Sans eux, l'installateur est simplement non signé.
-- **Site de présentation** (`site/`) : *Settings › Pages › Source : GitHub Actions*.
 
 Pour produire localement un installateur avec les fichiers de mise à jour signés :
 

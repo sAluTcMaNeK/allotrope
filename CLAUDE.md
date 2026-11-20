@@ -42,7 +42,7 @@ Logiciel de bureau de conversion de fichiers tout-en-un. Le nom vient de la chim
 2. **v0.2** : PNG → SVG (vtracer), traitement par lots, préréglages.
 3. **v0.3** : module vidéo FFmpeg avec progression en temps réel.
 4. **v0.4** : module documents (Word → PDF, fusion PDF, PDF → images).
-5. **v1.0** : polissage de l'interface, signature de code (ex. Azure Trusted Signing), site de présentation, builds macOS et Linux.
+5. **v1.0** : polissage de l'interface, signature de code (ex. Azure Trusted Signing), page de présentation du dépôt GitHub (README, téléchargement via les Releases), builds macOS et Linux.
 
 ## Prérequis de développement (Windows)
 
