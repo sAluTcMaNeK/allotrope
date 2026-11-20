@@ -16,6 +16,8 @@ export interface Reglages {
   compression: OptionsCompression;
   /** Préréglages créés par l'utilisateur. */
   prereglages: Prereglage[];
+  /** Rechercher une nouvelle version au démarrage. */
+  miseAJourAuto: boolean;
 }
 
 const CLE = "allotrope.reglages";
@@ -26,6 +28,7 @@ const DEFAUTS: Reglages = {
   qualite: 85,
   compression: { ...OPTIONS_COMPRESSION_DEFAUT },
   prereglages: [],
+  miseAJourAuto: true,
 };
 
 function charger(): Reglages {
@@ -40,6 +43,7 @@ function charger(): Reglages {
       qualite: lus.qualite ?? DEFAUTS.qualite,
       compression: { ...DEFAUTS.compression, ...lus.compression },
       prereglages: Array.isArray(lus.prereglages) ? lus.prereglages : [],
+      miseAJourAuto: lus.miseAJourAuto ?? DEFAUTS.miseAJourAuto,
     };
   } catch {
     return structuredClone(DEFAUTS);

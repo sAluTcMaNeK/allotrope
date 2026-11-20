@@ -39,6 +39,7 @@
   import type { Page } from "./lib/navigation";
   import { PREREGLAGES_INTEGRES, nouvelIdentifiant, type Prereglage } from "./lib/prereglages";
   import { reglages } from "./lib/reglages.svelte";
+  import { miseAJour, rechercherMiseAJour } from "./lib/mises-a-jour.svelte";
 
   /** Nombre maximal de traitements simultanés. */
   const TRAITEMENTS_PARALLELES = Math.max(1, Math.min(4, navigator.hardwareConcurrency || 2));
@@ -306,6 +307,15 @@
   onMount(() => {
     // Destination par défaut : Documents\Allotrope (créé au premier fichier produit)
     initialiserDestination();
+
+    // Recherche discrète d'une nouvelle version (désactivable dans les Paramètres)
+    if (reglages.miseAJourAuto) {
+      rechercherMiseAJour(true).then(() => {
+        if (miseAJour.etat.etape === "disponible") {
+          afficherMessage(`Allotrope ${miseAJour.etat.version} est disponible : Paramètres › Mises à jour.`);
+        }
+      });
+    }
 
     // Fichiers passés au lancement, puis ceux des lancements suivants (fenêtre déjà ouverte)
     invoke<string[]>("fichiers_au_demarrage").then(recevoirFichiers);

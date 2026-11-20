@@ -25,6 +25,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         // Lancer FFmpeg (sidecar) pour l'audio et la vidéo
         .plugin(tauri_plugin_shell::init())
+        // Mises à jour : vérifie et installe les nouvelles versions publiées sur GitHub (signées)
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        // Redémarrage de l'application après l'installation d'une mise à jour
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Fichiers passés au premier lancement : l'interface les demandera une fois prête
             let arguments: Vec<String> = std::env::args().collect();

@@ -48,5 +48,16 @@
         "installerHooks": "./windows/menu-contextuel.nsh"
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA3QkIyMjI1MjE4MkIwQ0QKUldUTnNJSWhKU0s3Qnl6ZFBXbmFkRG9XV0hPRWEzdXpaUmdTNGk1SGRhNWlvMG96TUNGV3lublUK",
+      "endpoints": [
+        "https://github.com/sAluTcMaNeK/allotrope/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
