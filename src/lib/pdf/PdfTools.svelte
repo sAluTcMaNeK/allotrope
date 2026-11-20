@@ -10,6 +10,14 @@
   import PdfEnImagesTool from "./PdfEnImagesTool.svelte";
   import PdfVersTexteTool from "./PdfVersTexteTool.svelte";
 
+  import type { OptionsCompression } from "../fichiers";
+
+  interface Props {
+    /** Demande d'ouverture d'un outil (préréglage) ; `jeton` change à chaque nouvelle demande. */
+    demande?: { outil: "compresser"; compression: OptionsCompression; jeton: number } | null;
+  }
+  let { demande = null }: Props = $props();
+
   type IdOutil =
     | "fusionner"
     | "reorganiser"
@@ -89,7 +97,19 @@
   ];
 
   let ouvert = $state<IdOutil | null>(null);
-  const retour = () => (ouvert = null);
+  /** Réglages du préréglage, valables tant que l'outil qu'il a ouvert reste affiché. */
+  let compressionDemandee = $state<OptionsCompression | null>(null);
+  const retour = () => {
+    ouvert = null;
+    compressionDemandee = null;
+  };
+
+  // Un préréglage ouvre directement l'outil demandé
+  $effect(() => {
+    if (!demande) return;
+    ouvert = demande.outil;
+    compressionDemandee = demande.compression;
+  });
 </script>
 
 {#if ouvert === "fusionner"}
@@ -101,7 +121,9 @@
 {:else if ouvert === "images"}
   <ImagesTool onretour={retour} />
 {:else if ouvert === "compresser"}
-  <CompressionPdfTool onretour={retour} />
+  {#key demande?.jeton}
+    <CompressionPdfTool onretour={retour} reglagesInitiaux={compressionDemandee} />
+  {/key}
 {:else if ouvert === "extraire-images"}
   <ExtractionImagesTool onretour={retour} />
 {:else if ouvert === "en-images"}

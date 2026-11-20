@@ -1,6 +1,7 @@
 // Réglages de l'application, conservés d'une session à l'autre.
 // Le suffixe `.svelte.ts` permet d'utiliser les runes ($state, $effect) en dehors d'un composant.
 import { OPTIONS_COMPRESSION_DEFAUT, type OptionsCompression } from "./fichiers";
+import type { Prereglage } from "./prereglages";
 
 export type TypeDestination = "documents" | "origine" | "personnalise";
 
@@ -13,6 +14,8 @@ export interface Reglages {
   qualite: number;
   /** Réglages de compression proposés par défaut. */
   compression: OptionsCompression;
+  /** Préréglages créés par l'utilisateur. */
+  prereglages: Prereglage[];
 }
 
 const CLE = "allotrope.reglages";
@@ -22,6 +25,7 @@ const DEFAUTS: Reglages = {
   dossierPersonnalise: "",
   qualite: 85,
   compression: { ...OPTIONS_COMPRESSION_DEFAUT },
+  prereglages: [],
 };
 
 function charger(): Reglages {
@@ -35,6 +39,7 @@ function charger(): Reglages {
       dossierPersonnalise: lus.dossierPersonnalise ?? DEFAUTS.dossierPersonnalise,
       qualite: lus.qualite ?? DEFAUTS.qualite,
       compression: { ...DEFAUTS.compression, ...lus.compression },
+      prereglages: Array.isArray(lus.prereglages) ? lus.prereglages : [],
     };
   } catch {
     return structuredClone(DEFAUTS);

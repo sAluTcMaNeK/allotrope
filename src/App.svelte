@@ -35,6 +35,7 @@
     type OptionsCompression,
   } from "./lib/fichiers";
   import type { Page } from "./lib/navigation";
+  import { PREREGLAGES_INTEGRES, nouvelIdentifiant, type Prereglage } from "./lib/prereglages";
   import { reglages } from "./lib/reglages.svelte";
 
   /** Nombre maximal de traitements simultanés. */
@@ -58,6 +59,13 @@
   });
   // Réglages de compression de la session, initialisés avec les valeurs par défaut des paramètres
   let compression = $state<OptionsCompression>({ ...reglages.compression });
+
+  /** Préréglages intégrés puis ceux de l'utilisateur. */
+  const prereglages = $derived([...PREREGLAGES_INTEGRES, ...reglages.prereglages]);
+  /** Préréglage appliqué en dernier ; oublié dès que l'on change un réglage ou de page. */
+  let prereglageActif = $state<string | null>(null);
+  /** Outil PDF à ouvrir par un préréglage. */
+  let demandePdf = $state<{ outil: "compresser"; compression: OptionsCompression; jeton: number } | null>(null);
 
   /** Famille de la page affichée, ou `null` sur l'accueil. */
   const famille = $derived<Famille | null>(
@@ -85,6 +93,53 @@
   function naviguer(cible: Page) {
     if (cible === "parametres" && page !== "parametres") pagePrecedente = page;
     page = cible;
+    prereglageActif = null;
+    demandePdf = null;
+  }
+
+  /** Ouvre la page du préréglage et applique son outil et ses réglages. */
+  function appliquerPrereglage(prereglage: Prereglage) {
+    if (enCours) {
+      afficherMessage("Attendez la fin du traitement en cours pour changer de réglages.");
+      return;
+    }
+    naviguer(prereglage.cible);
+    if (prereglage.cible === "pdf") {
+      if (prereglage.compression) {
+        demandePdf = { outil: "compresser", compression: { ...prereglage.compression }, jeton: Date.now() };
+      }
+    } else {
+      changerMode(prereglage.mode);
+      if (prereglage.mode === "convertir" && prereglage.format) changerCible(prereglage.format);
+      if (prereglage.mode === "compresser" && prereglage.compression) changerCompression(prereglage.compression);
+    }
+    prereglageActif = prereglage.id;
+  }
+
+  /** Enregistre l'outil et les réglages de la page affichée sous forme de préréglage. */
+  function enregistrerPrereglage(nom: string): boolean {
+    if (!famille) {
+      afficherMessage("Ouvrez la page Images, Vidéo ou Audio pour enregistrer ses réglages.");
+      return false;
+    }
+    const prereglage: Prereglage = {
+      id: nouvelIdentifiant(),
+      nom,
+      cible: famille,
+      mode,
+      ...(mode === "convertir"
+        ? { format: cibles[famille] as FormatSortie }
+        : { compression: { ...compression } }),
+    };
+    reglages.prereglages.push(prereglage);
+    prereglageActif = prereglage.id;
+    afficherMessage(`Préréglage « ${nom} » enregistré.`);
+    return true;
+  }
+
+  function supprimerPrereglage(id: string) {
+    reglages.prereglages = reglages.prereglages.filter((p) => p.id !== id);
+    if (prereglageActif === id) prereglageActif = null;
   }
 
   function basculerParametres() {
@@ -145,6 +200,7 @@
   function changerMode(nouveau: Mode) {
     if (enCours || nouveau === mode) return;
     mode = nouveau;
+    prereglageActif = null;
     elements.forEach(reinitialiser);
   }
 
@@ -152,6 +208,7 @@
   function changerCible(cible: string) {
     if (!famille) return;
     cibles[famille] = cible;
+    prereglageActif = null;
     for (const element of visibles) {
       if (element.etat === "encours") continue;
       const format = cible as FormatSortie;
@@ -169,6 +226,7 @@
 
   function changerCompression(modification: Partial<OptionsCompression>) {
     Object.assign(compression, modification);
+    prereglageActif = null;
     elements.forEach(reinitialiser);
   }
 
@@ -267,13 +325,22 @@
   <TitleBar parametresActif={page === "parametres"} onparametres={basculerParametres} />
 
   <div class="corps">
-    <Sidebar {page} {compteurs} onnaviguer={naviguer} />
+    <Sidebar
+      {page}
+      {compteurs}
+      onnaviguer={naviguer}
+      {prereglages}
+      {prereglageActif}
+      onprereglage={appliquerPrereglage}
+      onenregistrer={enregistrerPrereglage}
+      onsupprimer={supprimerPrereglage}
+    />
 
     <main class="contenu">
       {#if page === "parametres"}
         <Settings onfermer={basculerParametres} />
       {:else if page === "pdf"}
-        <PdfTools />
+        <PdfTools demande={demandePdf} />
       {:else}
         <div class="page">
           <div class="defilement">

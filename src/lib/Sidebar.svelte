@@ -1,16 +1,44 @@
-<!-- Barre latérale : accueil, pages par type de fichiers, outils PDF et rappel « 100 % local ». -->
+<!-- Barre latérale : accueil, pages par type de fichiers, outils PDF, préréglages et rappel « 100 % local ». -->
 <script lang="ts">
-  import { FileStack, House, ShieldCheck } from "@lucide/svelte";
+  import { tick } from "svelte";
+  import { FileStack, House, Plus, ShieldCheck, X } from "@lucide/svelte";
   import { LISTE_FAMILLES } from "./fichiers";
   import type { Page } from "./navigation";
+  import type { Prereglage } from "./prereglages";
 
   interface Props {
     page: Page;
     /** Nombre de fichiers en file d'attente pour chaque page. */
     compteurs: Record<string, number>;
     onnaviguer: (page: Page) => void;
+    prereglages: Prereglage[];
+    /** Préréglage appliqué en dernier (tant que ses réglages n'ont pas été modifiés). */
+    prereglageActif: string | null;
+    onprereglage: (prereglage: Prereglage) => void;
+    /** Enregistre les réglages de la page affichée ; renvoie faux si ce n'est pas possible ici. */
+    onenregistrer: (nom: string) => boolean;
+    onsupprimer: (id: string) => void;
   }
-  let { page, compteurs, onnaviguer }: Props = $props();
+  let { page, compteurs, onnaviguer, prereglages, prereglageActif, onprereglage, onenregistrer, onsupprimer }: Props =
+    $props();
+
+  /** Saisie du nom d'un nouveau préréglage. */
+  let saisie = $state(false);
+  let nom = $state("");
+  let champ = $state<HTMLInputElement>();
+
+  async function commencerSaisie() {
+    saisie = true;
+    nom = "";
+    await tick();
+    champ?.focus();
+  }
+
+  function valider() {
+    const propre = nom.trim();
+    if (propre && onenregistrer(propre)) saisie = false;
+    else if (!propre) saisie = false;
+  }
 </script>
 
 <nav class="laterale" aria-label="Navigation principale">
@@ -54,6 +82,59 @@
       <FileStack size={18} strokeWidth={2.4} />
       <span class="texte">Outils PDF</span>
     </button>
+  </div>
+
+  <div class="groupe">
+    <div class="sur-titre">Préréglages</div>
+    {#each prereglages as prereglage (prereglage.id)}
+      <div class="prereglage" class:actif={prereglageActif === prereglage.id}>
+        <button
+          class="nom-prereglage"
+          aria-pressed={prereglageActif === prereglage.id}
+          onclick={() => onprereglage(prereglage)}
+        >
+          {prereglage.nom}
+        </button>
+        {#if !prereglage.integre}
+          <button
+            class="supprimer"
+            aria-label={`Supprimer le préréglage « ${prereglage.nom} »`}
+            onclick={() => onsupprimer(prereglage.id)}
+          >
+            <X size={16} strokeWidth={2.6} />
+          </button>
+        {/if}
+      </div>
+    {/each}
+
+    {#if saisie}
+      <form
+        class="saisie"
+        onsubmit={(e) => {
+          e.preventDefault();
+          valider();
+        }}
+      >
+        <input
+          bind:this={champ}
+          bind:value={nom}
+          maxlength="40"
+          placeholder="Nom du préréglage"
+          aria-label="Nom du nouveau préréglage"
+          onkeydown={(e) => {
+            if (e.key === "Escape") saisie = false;
+          }}
+          onblur={() => {
+            if (!nom.trim()) saisie = false;
+          }}
+        />
+      </form>
+    {:else}
+      <button class="nouveau" onclick={commencerSaisie}>
+        <Plus size={14} strokeWidth={3} />
+        Nouveau préréglage
+      </button>
+    {/if}
   </div>
 
   <div class="local">
@@ -145,6 +226,114 @@
     height: 12px;
     border-radius: 4px;
     border: 2px solid var(--givre);
+  }
+
+  /* Préréglages : éléments plus discrets que la navigation (maquette accueil.html) */
+  .prereglage {
+    display: flex;
+    align-items: center;
+    border-radius: 14px;
+    transition: background-color var(--transition);
+  }
+
+  .prereglage:hover:not(.actif) {
+    background: var(--surface);
+  }
+
+  .prereglage.actif {
+    background: var(--surface-active);
+  }
+
+  .nom-prereglage {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    padding: 0 14px;
+    border: none;
+    background: transparent;
+    color: var(--givre);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .prereglage.actif .nom-prereglage {
+    font-weight: 800;
+  }
+
+  .supprimer {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--texte-secondaire);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition:
+      opacity var(--transition),
+      color var(--transition);
+  }
+
+  .prereglage:hover .supprimer,
+  .supprimer:focus-visible {
+    opacity: 1;
+  }
+
+  .supprimer:hover {
+    color: var(--givre);
+  }
+
+  .nouveau {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 14px;
+    border: 2px dashed var(--ligne-forte);
+    background: transparent;
+    color: var(--lien);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--transition);
+  }
+
+  .nouveau:hover {
+    border-color: var(--lien);
+  }
+
+  .saisie input {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 14px;
+    border: 2px solid var(--givre);
+    background: var(--abysse);
+    color: var(--givre);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .saisie input::placeholder {
+    color: var(--texte-secondaire);
+  }
+
+  .saisie input:focus {
+    outline: none;
   }
 
   .local {
